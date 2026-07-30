@@ -40,8 +40,59 @@ void main() {
       workoutRepository: workoutRepository,
     ).seedIfEmpty();
 
-    expect(await exerciseRepository.getAll(), hasLength(9));
-    expect(await workoutRepository.getAll(), hasLength(6));
+    final List<Exercise> exercises = await exerciseRepository.getAll();
+    final List<Workout> workouts = await workoutRepository.getAll();
+
+    expect(exercises, hasLength(28));
+    expect(workouts, hasLength(6));
+    expect(
+      exercises.map((Exercise exercise) => exercise.name),
+      isNot(contains('Machine Chest Press')),
+    );
+    expect(
+      exercises.map((Exercise exercise) => exercise.name),
+      isNot(contains('Cable Lateral Raise')),
+    );
+
+    for (final _ExpectedWorkout expectedWorkout in _expectedWorkouts) {
+      final Workout workout = workouts.singleWhere(
+        (Workout candidate) => candidate.name == expectedWorkout.name,
+      );
+      expect(workout.id, expectedWorkout.id);
+      expect(
+        workout.exerciseIds,
+        equals(
+          expectedWorkout.prescriptions
+              .map(
+                (_ExpectedPrescription prescription) => prescription.exerciseId,
+              )
+              .toList(growable: false),
+        ),
+      );
+      expect(workout.sets, hasLength(15));
+
+      for (final _ExpectedPrescription prescription
+          in expectedWorkout.prescriptions) {
+        final List<WorkoutSet> sets = workout.sets
+            .where(
+              (WorkoutSet set) => set.exerciseId == prescription.exerciseId,
+            )
+            .toList(growable: false);
+        expect(sets, hasLength(3));
+        expect(
+          sets.map((WorkoutSet set) => set.setNumber),
+          equals(<int>[1, 2, 3]),
+        );
+        expect(
+          sets.map((WorkoutSet set) => set.targetReps),
+          everyElement(equals(prescription.targetReps)),
+        );
+        expect(
+          sets.map((WorkoutSet set) => set.notes),
+          everyElement(equals(prescription.notes)),
+        );
+      }
+    }
 
     await WorkoutSeedService(
       exerciseRepository: exerciseRepository,
@@ -84,4 +135,123 @@ void main() {
       contains(workout),
     );
   });
+}
+
+const List<_ExpectedWorkout> _expectedWorkouts = <_ExpectedWorkout>[
+  _ExpectedWorkout(
+    id: 'seed-workout-push-a',
+    name: 'Push A',
+    prescriptions: <_ExpectedPrescription>[
+      _ExpectedPrescription('seed-exercise-barbell-bench-press', 10,
+          'Target 6–10 reps; rest 2–3 min'),
+      _ExpectedPrescription('seed-exercise-incline-dumbbell-press', 12,
+          'Target 8–12 reps; rest 2 min'),
+      _ExpectedPrescription('seed-exercise-seated-dumbbell-shoulder-press', 12,
+          'Target 8–12 reps; rest 2 min'),
+      _ExpectedPrescription('seed-exercise-dumbbell-lateral-raise', 15,
+          'Target 12–15 reps; rest 60–90 sec'),
+      _ExpectedPrescription('seed-exercise-cable-triceps-pushdown', 15,
+          'Target 10–15 reps; rest 60–90 sec'),
+    ],
+  ),
+  _ExpectedWorkout(
+    id: 'seed-workout-pull-a',
+    name: 'Pull A',
+    prescriptions: <_ExpectedPrescription>[
+      _ExpectedPrescription('seed-exercise-barbell-bent-over-row', 10,
+          'Target 6–10 reps; rest 2–3 min'),
+      _ExpectedPrescription('seed-exercise-one-arm-dumbbell-row', 12,
+          'Target 8–12 reps per side; rest 90 sec'),
+      _ExpectedPrescription('seed-exercise-cable-lat-pulldown', 12,
+          'Target 8–12 reps; rest 2 min'),
+      _ExpectedPrescription('seed-exercise-dumbbell-rear-delt-fly', 15,
+          'Target 12–15 reps; rest 60–90 sec'),
+      _ExpectedPrescription('seed-exercise-dumbbell-hammer-curl', 15,
+          'Target 10–15 reps; rest 60–90 sec'),
+    ],
+  ),
+  _ExpectedWorkout(
+    id: 'seed-workout-legs-a',
+    name: 'Legs A',
+    prescriptions: <_ExpectedPrescription>[
+      _ExpectedPrescription('seed-exercise-barbell-back-squat', 10,
+          'Target 6–10 reps; rest 2–3 min'),
+      _ExpectedPrescription('seed-exercise-romanian-deadlift', 12,
+          'Target 8–12 reps; rest 2–3 min'),
+      _ExpectedPrescription('seed-exercise-dumbbell-reverse-lunge', 12,
+          'Target 8–12 reps per leg; rest 90 sec'),
+      _ExpectedPrescription('seed-exercise-standing-dumbbell-calf-raise', 15,
+          'Target 12–15 reps; rest 60–90 sec'),
+      _ExpectedPrescription(
+          'seed-exercise-plank', 45, 'Hold for 30–45 seconds; rest 60 sec'),
+    ],
+  ),
+  _ExpectedWorkout(
+    id: 'seed-workout-push-b',
+    name: 'Push B',
+    prescriptions: <_ExpectedPrescription>[
+      _ExpectedPrescription('seed-exercise-incline-barbell-bench-press', 10,
+          'Target 6–10 reps; rest 2–3 min'),
+      _ExpectedPrescription('seed-exercise-flat-dumbbell-bench-press', 12,
+          'Target 8–12 reps; rest 2 min'),
+      _ExpectedPrescription('seed-exercise-standing-barbell-overhead-press', 10,
+          'Target 6–10 reps; rest 2–3 min'),
+      _ExpectedPrescription('seed-exercise-dumbbell-lateral-raise', 15,
+          'Target 12–15 reps; rest 60–90 sec'),
+      _ExpectedPrescription('seed-exercise-overhead-dumbbell-triceps-extension',
+          15, 'Target 10–15 reps; rest 60–90 sec'),
+    ],
+  ),
+  _ExpectedWorkout(
+    id: 'seed-workout-pull-b',
+    name: 'Pull B',
+    prescriptions: <_ExpectedPrescription>[
+      _ExpectedPrescription('seed-exercise-conventional-deadlift', 8,
+          'Target 5–8 reps; rest 3 min'),
+      _ExpectedPrescription('seed-exercise-chest-supported-dumbbell-row', 12,
+          'Target 8–12 reps; rest 2 min'),
+      _ExpectedPrescription(
+          'seed-exercise-cable-seated-row', 12, 'Target 8–12 reps; rest 2 min'),
+      _ExpectedPrescription('seed-exercise-cable-face-pull', 15,
+          'Target 12–15 reps; rest 60–90 sec'),
+      _ExpectedPrescription('seed-exercise-alternating-dumbbell-curl', 15,
+          'Target 10–15 reps per arm; rest 60–90 sec'),
+    ],
+  ),
+  _ExpectedWorkout(
+    id: 'seed-workout-legs-b',
+    name: 'Legs B',
+    prescriptions: <_ExpectedPrescription>[
+      _ExpectedPrescription('seed-exercise-barbell-front-squat', 10,
+          'Target 6–10 reps; rest 2–3 min'),
+      _ExpectedPrescription('seed-exercise-barbell-hip-thrust', 12,
+          'Target 8–12 reps; rest 2 min'),
+      _ExpectedPrescription('seed-exercise-dumbbell-bulgarian-split-squat', 12,
+          'Target 8–12 reps per leg; rest 90 sec'),
+      _ExpectedPrescription('seed-exercise-standing-dumbbell-calf-raise', 15,
+          'Target 12–15 reps; rest 60–90 sec'),
+      _ExpectedPrescription('seed-exercise-lying-leg-raise', 15,
+          'Target 10–15 reps; rest 60 sec'),
+    ],
+  ),
+];
+
+class _ExpectedWorkout {
+  const _ExpectedWorkout({
+    required this.id,
+    required this.name,
+    required this.prescriptions,
+  });
+
+  final String id;
+  final String name;
+  final List<_ExpectedPrescription> prescriptions;
+}
+
+class _ExpectedPrescription {
+  const _ExpectedPrescription(this.exerciseId, this.targetReps, this.notes);
+
+  final String exerciseId;
+  final int targetReps;
+  final String notes;
 }

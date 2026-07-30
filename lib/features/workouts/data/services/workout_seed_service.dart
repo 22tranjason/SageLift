@@ -1,9 +1,10 @@
 import '../../domain/models/exercise.dart';
 import '../../domain/models/workout.dart';
+import '../../domain/models/workout_set.dart';
 import '../../domain/repositories/exercise_repository.dart';
 import '../../domain/repositories/workout_repository.dart';
 
-/// Adds the initial placeholder workout catalogue to an empty local database.
+/// Adds Jason's initial push, pull, legs programme to an empty local database.
 class WorkoutSeedService {
   /// Creates a seed service over the workout and exercise repositories.
   const WorkoutSeedService({
@@ -15,7 +16,7 @@ class WorkoutSeedService {
   final ExerciseRepository _exerciseRepository;
   final WorkoutRepository _workoutRepository;
 
-  /// Inserts placeholder exercises and the six default workouts when empty.
+  /// Inserts the programme only when the workout database is completely empty.
   ///
   /// Existing data is never changed, so repeated startup calls are safe.
   Future<void> seedIfEmpty() async {
@@ -23,15 +24,15 @@ class WorkoutSeedService {
     final List<Workout> existingWorkouts = await _workoutRepository.getAll();
     if (existingExercises.isNotEmpty || existingWorkouts.isNotEmpty) return;
 
-    for (final Exercise exercise in _placeholderExercises) {
+    for (final Exercise exercise in _exercises) {
       await _exerciseRepository.save(exercise);
     }
-    for (final Workout workout in _defaultWorkouts) {
+    for (final Workout workout in _workouts) {
       await _workoutRepository.save(workout);
     }
   }
 
-  static const List<Exercise> _placeholderExercises = <Exercise>[
+  static const List<Exercise> _exercises = <Exercise>[
     Exercise(
       id: 'seed-exercise-barbell-bench-press',
       name: 'Barbell Bench Press',
@@ -40,43 +41,71 @@ class WorkoutSeedService {
       equipment: Equipment.barbell,
     ),
     Exercise(
-      id: 'seed-exercise-overhead-press',
-      name: 'Overhead Press',
+      id: 'seed-exercise-incline-dumbbell-press',
+      name: 'Incline Dumbbell Press',
       category: ExerciseCategory.strength,
-      primaryMuscleGroup: MuscleGroup.shoulders,
-      equipment: Equipment.barbell,
+      primaryMuscleGroup: MuscleGroup.chest,
+      equipment: Equipment.dumbbells,
     ),
     Exercise(
-      id: 'seed-exercise-triceps-pressdown',
-      name: 'Triceps Pressdown',
+      id: 'seed-exercise-seated-dumbbell-shoulder-press',
+      name: 'Seated Dumbbell Shoulder Press',
+      category: ExerciseCategory.strength,
+      primaryMuscleGroup: MuscleGroup.shoulders,
+      equipment: Equipment.dumbbells,
+    ),
+    Exercise(
+      id: 'seed-exercise-dumbbell-lateral-raise',
+      name: 'Dumbbell Lateral Raise',
+      category: ExerciseCategory.strength,
+      primaryMuscleGroup: MuscleGroup.shoulders,
+      equipment: Equipment.dumbbells,
+    ),
+    Exercise(
+      id: 'seed-exercise-cable-triceps-pushdown',
+      name: 'Cable Triceps Pushdown',
       category: ExerciseCategory.strength,
       primaryMuscleGroup: MuscleGroup.arms,
       equipment: Equipment.cableMachine,
     ),
     Exercise(
-      id: 'seed-exercise-lat-pulldown',
-      name: 'Lat Pulldown',
-      category: ExerciseCategory.strength,
-      primaryMuscleGroup: MuscleGroup.back,
-      equipment: Equipment.cableMachine,
-    ),
-    Exercise(
-      id: 'seed-exercise-barbell-row',
-      name: 'Barbell Row',
+      id: 'seed-exercise-barbell-bent-over-row',
+      name: 'Barbell Bent-Over Row',
       category: ExerciseCategory.strength,
       primaryMuscleGroup: MuscleGroup.back,
       equipment: Equipment.barbell,
     ),
     Exercise(
-      id: 'seed-exercise-biceps-curl',
-      name: 'Biceps Curl',
+      id: 'seed-exercise-one-arm-dumbbell-row',
+      name: 'One-Arm Dumbbell Row',
+      category: ExerciseCategory.strength,
+      primaryMuscleGroup: MuscleGroup.back,
+      equipment: Equipment.dumbbells,
+    ),
+    Exercise(
+      id: 'seed-exercise-cable-lat-pulldown',
+      name: 'Cable Lat Pulldown',
+      category: ExerciseCategory.strength,
+      primaryMuscleGroup: MuscleGroup.back,
+      equipment: Equipment.cableMachine,
+    ),
+    Exercise(
+      id: 'seed-exercise-dumbbell-rear-delt-fly',
+      name: 'Dumbbell Rear-Delt Fly',
+      category: ExerciseCategory.strength,
+      primaryMuscleGroup: MuscleGroup.shoulders,
+      equipment: Equipment.dumbbells,
+    ),
+    Exercise(
+      id: 'seed-exercise-dumbbell-hammer-curl',
+      name: 'Dumbbell Hammer Curl',
       category: ExerciseCategory.strength,
       primaryMuscleGroup: MuscleGroup.arms,
       equipment: Equipment.dumbbells,
     ),
     Exercise(
-      id: 'seed-exercise-back-squat',
-      name: 'Back Squat',
+      id: 'seed-exercise-barbell-back-squat',
+      name: 'Barbell Back Squat',
       category: ExerciseCategory.strength,
       primaryMuscleGroup: MuscleGroup.legs,
       equipment: Equipment.barbell,
@@ -89,67 +118,304 @@ class WorkoutSeedService {
       equipment: Equipment.barbell,
     ),
     Exercise(
-      id: 'seed-exercise-leg-press',
-      name: 'Leg Press',
+      id: 'seed-exercise-dumbbell-reverse-lunge',
+      name: 'Dumbbell Reverse Lunge',
       category: ExerciseCategory.strength,
       primaryMuscleGroup: MuscleGroup.legs,
-      equipment: Equipment.machine,
+      equipment: Equipment.dumbbells,
+    ),
+    Exercise(
+      id: 'seed-exercise-standing-dumbbell-calf-raise',
+      name: 'Standing Dumbbell Calf Raise',
+      category: ExerciseCategory.strength,
+      primaryMuscleGroup: MuscleGroup.legs,
+      equipment: Equipment.dumbbells,
+    ),
+    Exercise(
+      id: 'seed-exercise-plank',
+      name: 'Plank',
+      category: ExerciseCategory.strength,
+      primaryMuscleGroup: MuscleGroup.core,
+      equipment: Equipment.bodyweight,
+    ),
+    Exercise(
+      id: 'seed-exercise-incline-barbell-bench-press',
+      name: 'Incline Barbell Bench Press',
+      category: ExerciseCategory.strength,
+      primaryMuscleGroup: MuscleGroup.chest,
+      equipment: Equipment.barbell,
+    ),
+    Exercise(
+      id: 'seed-exercise-flat-dumbbell-bench-press',
+      name: 'Flat Dumbbell Bench Press',
+      category: ExerciseCategory.strength,
+      primaryMuscleGroup: MuscleGroup.chest,
+      equipment: Equipment.dumbbells,
+    ),
+    Exercise(
+      id: 'seed-exercise-standing-barbell-overhead-press',
+      name: 'Standing Barbell Overhead Press',
+      category: ExerciseCategory.strength,
+      primaryMuscleGroup: MuscleGroup.shoulders,
+      equipment: Equipment.barbell,
+    ),
+    Exercise(
+      id: 'seed-exercise-overhead-dumbbell-triceps-extension',
+      name: 'Overhead Dumbbell Triceps Extension',
+      category: ExerciseCategory.strength,
+      primaryMuscleGroup: MuscleGroup.arms,
+      equipment: Equipment.dumbbells,
+    ),
+    Exercise(
+      id: 'seed-exercise-conventional-deadlift',
+      name: 'Conventional Deadlift',
+      category: ExerciseCategory.strength,
+      primaryMuscleGroup: MuscleGroup.legs,
+      equipment: Equipment.barbell,
+    ),
+    Exercise(
+      id: 'seed-exercise-chest-supported-dumbbell-row',
+      name: 'Chest-Supported Dumbbell Row on Incline Bench',
+      category: ExerciseCategory.strength,
+      primaryMuscleGroup: MuscleGroup.back,
+      equipment: Equipment.dumbbells,
+    ),
+    Exercise(
+      id: 'seed-exercise-cable-seated-row',
+      name: 'Cable Seated Row',
+      category: ExerciseCategory.strength,
+      primaryMuscleGroup: MuscleGroup.back,
+      equipment: Equipment.cableMachine,
+    ),
+    Exercise(
+      id: 'seed-exercise-cable-face-pull',
+      name: 'Cable Face Pull',
+      category: ExerciseCategory.strength,
+      primaryMuscleGroup: MuscleGroup.shoulders,
+      equipment: Equipment.cableMachine,
+    ),
+    Exercise(
+      id: 'seed-exercise-alternating-dumbbell-curl',
+      name: 'Alternating Dumbbell Curl',
+      category: ExerciseCategory.strength,
+      primaryMuscleGroup: MuscleGroup.arms,
+      equipment: Equipment.dumbbells,
+    ),
+    Exercise(
+      id: 'seed-exercise-barbell-front-squat',
+      name: 'Barbell Front Squat',
+      category: ExerciseCategory.strength,
+      primaryMuscleGroup: MuscleGroup.legs,
+      equipment: Equipment.barbell,
+    ),
+    Exercise(
+      id: 'seed-exercise-barbell-hip-thrust',
+      name: 'Barbell Hip Thrust',
+      category: ExerciseCategory.strength,
+      primaryMuscleGroup: MuscleGroup.glutes,
+      equipment: Equipment.barbell,
+    ),
+    Exercise(
+      id: 'seed-exercise-dumbbell-bulgarian-split-squat',
+      name: 'Dumbbell Bulgarian Split Squat',
+      category: ExerciseCategory.strength,
+      primaryMuscleGroup: MuscleGroup.legs,
+      equipment: Equipment.dumbbells,
+    ),
+    Exercise(
+      id: 'seed-exercise-lying-leg-raise',
+      name: 'Lying Leg Raise',
+      category: ExerciseCategory.strength,
+      primaryMuscleGroup: MuscleGroup.core,
+      equipment: Equipment.bodyweight,
     ),
   ];
 
-  static final List<Workout> _defaultWorkouts = <Workout>[
+  static final List<Workout> _workouts = <Workout>[
     _workout(
       id: 'seed-workout-push-a',
       name: 'Push A',
-      exerciseIds: <String>[
-        'seed-exercise-barbell-bench-press',
-        'seed-exercise-overhead-press',
-        'seed-exercise-triceps-pressdown',
+      prescriptions: const <_ExercisePrescription>[
+        _ExercisePrescription(
+          exerciseId: 'seed-exercise-barbell-bench-press',
+          targetReps: 10,
+          notes: 'Target 6–10 reps; rest 2–3 min',
+        ),
+        _ExercisePrescription(
+          exerciseId: 'seed-exercise-incline-dumbbell-press',
+          targetReps: 12,
+          notes: 'Target 8–12 reps; rest 2 min',
+        ),
+        _ExercisePrescription(
+          exerciseId: 'seed-exercise-seated-dumbbell-shoulder-press',
+          targetReps: 12,
+          notes: 'Target 8–12 reps; rest 2 min',
+        ),
+        _ExercisePrescription(
+          exerciseId: 'seed-exercise-dumbbell-lateral-raise',
+          targetReps: 15,
+          notes: 'Target 12–15 reps; rest 60–90 sec',
+        ),
+        _ExercisePrescription(
+          exerciseId: 'seed-exercise-cable-triceps-pushdown',
+          targetReps: 15,
+          notes: 'Target 10–15 reps; rest 60–90 sec',
+        ),
       ],
     ),
     _workout(
       id: 'seed-workout-pull-a',
       name: 'Pull A',
-      exerciseIds: <String>[
-        'seed-exercise-lat-pulldown',
-        'seed-exercise-barbell-row',
-        'seed-exercise-biceps-curl',
+      prescriptions: const <_ExercisePrescription>[
+        _ExercisePrescription(
+          exerciseId: 'seed-exercise-barbell-bent-over-row',
+          targetReps: 10,
+          notes: 'Target 6–10 reps; rest 2–3 min',
+        ),
+        _ExercisePrescription(
+          exerciseId: 'seed-exercise-one-arm-dumbbell-row',
+          targetReps: 12,
+          notes: 'Target 8–12 reps per side; rest 90 sec',
+        ),
+        _ExercisePrescription(
+          exerciseId: 'seed-exercise-cable-lat-pulldown',
+          targetReps: 12,
+          notes: 'Target 8–12 reps; rest 2 min',
+        ),
+        _ExercisePrescription(
+          exerciseId: 'seed-exercise-dumbbell-rear-delt-fly',
+          targetReps: 15,
+          notes: 'Target 12–15 reps; rest 60–90 sec',
+        ),
+        _ExercisePrescription(
+          exerciseId: 'seed-exercise-dumbbell-hammer-curl',
+          targetReps: 15,
+          notes: 'Target 10–15 reps; rest 60–90 sec',
+        ),
       ],
     ),
     _workout(
       id: 'seed-workout-legs-a',
       name: 'Legs A',
-      exerciseIds: <String>[
-        'seed-exercise-back-squat',
-        'seed-exercise-romanian-deadlift',
-        'seed-exercise-leg-press',
+      prescriptions: const <_ExercisePrescription>[
+        _ExercisePrescription(
+          exerciseId: 'seed-exercise-barbell-back-squat',
+          targetReps: 10,
+          notes: 'Target 6–10 reps; rest 2–3 min',
+        ),
+        _ExercisePrescription(
+          exerciseId: 'seed-exercise-romanian-deadlift',
+          targetReps: 12,
+          notes: 'Target 8–12 reps; rest 2–3 min',
+        ),
+        _ExercisePrescription(
+          exerciseId: 'seed-exercise-dumbbell-reverse-lunge',
+          targetReps: 12,
+          notes: 'Target 8–12 reps per leg; rest 90 sec',
+        ),
+        _ExercisePrescription(
+          exerciseId: 'seed-exercise-standing-dumbbell-calf-raise',
+          targetReps: 15,
+          notes: 'Target 12–15 reps; rest 60–90 sec',
+        ),
+        _ExercisePrescription(
+          exerciseId: 'seed-exercise-plank',
+          targetReps: 45,
+          notes: 'Hold for 30–45 seconds; rest 60 sec',
+        ),
       ],
     ),
     _workout(
       id: 'seed-workout-push-b',
       name: 'Push B',
-      exerciseIds: <String>[
-        'seed-exercise-overhead-press',
-        'seed-exercise-barbell-bench-press',
-        'seed-exercise-triceps-pressdown',
+      prescriptions: const <_ExercisePrescription>[
+        _ExercisePrescription(
+          exerciseId: 'seed-exercise-incline-barbell-bench-press',
+          targetReps: 10,
+          notes: 'Target 6–10 reps; rest 2–3 min',
+        ),
+        _ExercisePrescription(
+          exerciseId: 'seed-exercise-flat-dumbbell-bench-press',
+          targetReps: 12,
+          notes: 'Target 8–12 reps; rest 2 min',
+        ),
+        _ExercisePrescription(
+          exerciseId: 'seed-exercise-standing-barbell-overhead-press',
+          targetReps: 10,
+          notes: 'Target 6–10 reps; rest 2–3 min',
+        ),
+        _ExercisePrescription(
+          exerciseId: 'seed-exercise-dumbbell-lateral-raise',
+          targetReps: 15,
+          notes: 'Target 12–15 reps; rest 60–90 sec',
+        ),
+        _ExercisePrescription(
+          exerciseId: 'seed-exercise-overhead-dumbbell-triceps-extension',
+          targetReps: 15,
+          notes: 'Target 10–15 reps; rest 60–90 sec',
+        ),
       ],
     ),
     _workout(
       id: 'seed-workout-pull-b',
       name: 'Pull B',
-      exerciseIds: <String>[
-        'seed-exercise-barbell-row',
-        'seed-exercise-lat-pulldown',
-        'seed-exercise-biceps-curl',
+      prescriptions: const <_ExercisePrescription>[
+        _ExercisePrescription(
+          exerciseId: 'seed-exercise-conventional-deadlift',
+          targetReps: 8,
+          notes: 'Target 5–8 reps; rest 3 min',
+        ),
+        _ExercisePrescription(
+          exerciseId: 'seed-exercise-chest-supported-dumbbell-row',
+          targetReps: 12,
+          notes: 'Target 8–12 reps; rest 2 min',
+        ),
+        _ExercisePrescription(
+          exerciseId: 'seed-exercise-cable-seated-row',
+          targetReps: 12,
+          notes: 'Target 8–12 reps; rest 2 min',
+        ),
+        _ExercisePrescription(
+          exerciseId: 'seed-exercise-cable-face-pull',
+          targetReps: 15,
+          notes: 'Target 12–15 reps; rest 60–90 sec',
+        ),
+        _ExercisePrescription(
+          exerciseId: 'seed-exercise-alternating-dumbbell-curl',
+          targetReps: 15,
+          notes: 'Target 10–15 reps per arm; rest 60–90 sec',
+        ),
       ],
     ),
     _workout(
       id: 'seed-workout-legs-b',
       name: 'Legs B',
-      exerciseIds: <String>[
-        'seed-exercise-leg-press',
-        'seed-exercise-back-squat',
-        'seed-exercise-romanian-deadlift',
+      prescriptions: const <_ExercisePrescription>[
+        _ExercisePrescription(
+          exerciseId: 'seed-exercise-barbell-front-squat',
+          targetReps: 10,
+          notes: 'Target 6–10 reps; rest 2–3 min',
+        ),
+        _ExercisePrescription(
+          exerciseId: 'seed-exercise-barbell-hip-thrust',
+          targetReps: 12,
+          notes: 'Target 8–12 reps; rest 2 min',
+        ),
+        _ExercisePrescription(
+          exerciseId: 'seed-exercise-dumbbell-bulgarian-split-squat',
+          targetReps: 12,
+          notes: 'Target 8–12 reps per leg; rest 90 sec',
+        ),
+        _ExercisePrescription(
+          exerciseId: 'seed-exercise-standing-dumbbell-calf-raise',
+          targetReps: 15,
+          notes: 'Target 12–15 reps; rest 60–90 sec',
+        ),
+        _ExercisePrescription(
+          exerciseId: 'seed-exercise-lying-leg-raise',
+          targetReps: 15,
+          notes: 'Target 10–15 reps; rest 60 sec',
+        ),
       ],
     ),
   ];
@@ -157,14 +423,40 @@ class WorkoutSeedService {
   static Workout _workout({
     required String id,
     required String name,
-    required List<String> exerciseIds,
+    required List<_ExercisePrescription> prescriptions,
   }) {
     return Workout(
       id: id,
       name: name,
       scheduledDate: DateTime.utc(2000),
       status: WorkoutStatus.planned,
-      exerciseIds: exerciseIds,
+      exerciseIds: prescriptions
+          .map((_ExercisePrescription prescription) => prescription.exerciseId)
+          .toList(growable: false),
+      sets: <WorkoutSet>[
+        for (final _ExercisePrescription prescription in prescriptions)
+          for (int setNumber = 1; setNumber <= 3; setNumber++)
+            WorkoutSet(
+              id: 'seed-set-$id-${prescription.exerciseId}-$setNumber',
+              exerciseId: prescription.exerciseId,
+              setNumber: setNumber,
+              targetReps: prescription.targetReps,
+              status: WorkoutSetStatus.planned,
+              notes: prescription.notes,
+            ),
+      ],
     );
   }
+}
+
+class _ExercisePrescription {
+  const _ExercisePrescription({
+    required this.exerciseId,
+    required this.targetReps,
+    required this.notes,
+  });
+
+  final String exerciseId;
+  final int targetReps;
+  final String notes;
 }
