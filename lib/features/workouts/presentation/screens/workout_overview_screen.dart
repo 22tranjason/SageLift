@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../app/router/app_router.dart';
 import '../providers/today_workout_provider.dart';
 import '../widgets/workout_exercise_list.dart';
 
@@ -38,7 +40,15 @@ class WorkoutOverviewScreen extends ConsumerWidget {
                       style: Theme.of(context).textTheme.headlineSmall,
                     ),
                     const SizedBox(height: 16),
-                    WorkoutExerciseList(exercises: workoutData.exercises),
+                    WorkoutExerciseList(
+                      exercises: workoutData.exercises,
+                      onExerciseTap: (int index) {
+                        context.pushNamed(
+                          AppRoute.exercise.name,
+                          pathParameters: <String, String>{'index': '$index'},
+                        );
+                      },
+                    ),
                   ],
                 ),
               );

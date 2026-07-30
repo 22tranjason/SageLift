@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sagelift/app/sagelift_app.dart';
@@ -74,6 +75,157 @@ void main() {
     expect(find.text('Workout Overview'), findsOneWidget);
     expect(find.text('Barbell Bench Press'), findsOneWidget);
     expect(find.text('Incline Dumbbell Press'), findsOneWidget);
+  });
+  testWidgets('focused exercise flow preserves set values between exercises', (
+    WidgetTester tester,
+  ) async {
+    const Exercise benchPress = Exercise(
+      id: 'bench-press',
+      name: 'Barbell Bench Press',
+      category: ExerciseCategory.strength,
+      equipment: Equipment.barbell,
+    );
+    const Exercise inclinePress = Exercise(
+      id: 'incline-press',
+      name: 'Incline Dumbbell Press',
+      category: ExerciseCategory.strength,
+      equipment: Equipment.dumbbells,
+    );
+    final Workout workout = Workout(
+      id: 'push-a',
+      name: 'Push A',
+      scheduledDate: DateTime.utc(2000),
+      status: WorkoutStatus.planned,
+      exerciseIds: <String>[benchPress.id, inclinePress.id],
+      sets: <WorkoutSet>[
+        WorkoutSet(
+          id: 'bench-1',
+          exerciseId: benchPress.id,
+          setNumber: 1,
+          targetReps: 10,
+          status: WorkoutSetStatus.planned,
+          notes: 'Target 6–10 reps; rest 2–3 min',
+        ),
+        WorkoutSet(
+          id: 'bench-2',
+          exerciseId: benchPress.id,
+          setNumber: 2,
+          targetReps: 10,
+          status: WorkoutSetStatus.planned,
+          notes: 'Target 6–10 reps; rest 2–3 min',
+        ),
+        WorkoutSet(
+          id: 'incline-1',
+          exerciseId: inclinePress.id,
+          setNumber: 1,
+          targetReps: 12,
+          status: WorkoutSetStatus.planned,
+          notes: 'Target 8–12 reps; rest 2 min',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: <Override>[
+          keyValueStoreProvider.overrideWithValue(_InMemoryKeyValueStore()),
+          exerciseRepositoryProvider.overrideWithValue(
+            _FakeExerciseRepository(<Exercise>[benchPress, inclinePress]),
+          ),
+          workoutRepositoryProvider.overrideWithValue(
+            _FakeWorkoutRepository(<Workout>[workout]),
+          ),
+        ],
+        child: const SageLiftApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Start Workout'));
+    await tester.tap(find.text('Start Workout'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Barbell Bench Press'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Barbell Bench Press'), findsOneWidget);
+    expect(find.text('Set 1'), findsOneWidget);
+    expect(find.text('Set 2'), findsOneWidget);
+    expect(find.text('Target reps: 10'), findsNWidgets(2));
+    expect(find.text('Target 6–10 reps; rest 2–3 min'), findsOneWidget);
+    expect(
+      tester
+          .widget<OutlinedButton>(
+            find.byKey(const ValueKey<String>('previous-exercise-button')),
+          )
+          .onPressed,
+      isNull,
+    );
+
+    await tester.enterText(
+      find.byKey(const ValueKey<String>('weight-bench-1')),
+      '80',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey<String>('reps-bench-1')),
+      '10',
+    );
+    await tester.tap(
+      find.byKey(const ValueKey<String>('completed-bench-1')),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Next Exercise'));
+    await tester.tap(find.text('Next Exercise'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Incline Dumbbell Press'), findsOneWidget);
+    expect(find.text('Target reps: 12'), findsOneWidget);
+    expect(
+      tester
+          .widget<OutlinedButton>(
+            find.byKey(const ValueKey<String>('previous-exercise-button')),
+          )
+          .onPressed,
+      isNotNull,
+    );
+    expect(
+      tester
+          .widget<OutlinedButton>(
+            find.byKey(const ValueKey<String>('next-exercise-button')),
+          )
+          .onPressed,
+      isNull,
+    );
+
+    await tester.ensureVisible(find.text('Previous Exercise'));
+    await tester.tap(find.text('Previous Exercise'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Barbell Bench Press'), findsOneWidget);
+    expect(
+      tester
+          .widget<TextFormField>(
+            find.byKey(const ValueKey<String>('weight-bench-1')),
+          )
+          .initialValue,
+      '80',
+    );
+    expect(
+      tester
+          .widget<TextFormField>(
+            find.byKey(const ValueKey<String>('reps-bench-1')),
+          )
+          .initialValue,
+      '10',
+    );
+    expect(
+      tester
+          .widget<CheckboxListTile>(
+            find.byKey(const ValueKey<String>('completed-bench-1')),
+          )
+          .value,
+      isTrue,
+    );
   });
 }
 

@@ -5,10 +5,17 @@ import '../../domain/models/exercise.dart';
 /// Displays a workout's resolved exercises in their defined order.
 class WorkoutExerciseList extends StatelessWidget {
   /// Creates an exercise list.
-  const WorkoutExerciseList({required this.exercises, super.key});
+  const WorkoutExerciseList({
+    required this.exercises,
+    this.onExerciseTap,
+    super.key,
+  });
 
   /// Exercises to display.
   final List<Exercise> exercises;
+
+  /// Optional callback invoked with an exercise's ordered index.
+  final ValueChanged<int>? onExerciseTap;
 
   @override
   Widget build(BuildContext context) {
@@ -20,7 +27,7 @@ class WorkoutExerciseList extends StatelessWidget {
               leading: CircleAvatar(child: Text('${index + 1}')),
               title: Text(exercises[index].name),
               subtitle: Text(_labelFor(exercises[index])),
-              onTap: () {},
+              onTap: onExerciseTap == null ? null : () => onExerciseTap!(index),
             ),
         ],
       ),
