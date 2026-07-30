@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sagelift/app/sagelift_app.dart';
@@ -69,7 +70,7 @@ void main() {
       FilledButton,
       'Start Workout',
     );
-    await tester.ensureVisible(startWorkoutButton);
+    await tester.ensureVisible(find.text('Start Workout'));
     await tester.pumpAndSettle();
     await tester.tap(startWorkoutButton);
     await tester.pumpAndSettle();
