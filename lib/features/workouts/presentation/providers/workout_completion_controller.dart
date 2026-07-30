@@ -69,8 +69,9 @@ class WorkoutCompletionController {
     final Workout? storedWorkout = await _workoutRepository.getById(workout.id);
     final Workout currentWorkout = storedWorkout ?? workout;
     if (currentWorkout.status == WorkoutStatus.completed) return null;
-    if (currentWorkout.status == WorkoutStatus.inProgress)
+    if (currentWorkout.status == WorkoutStatus.inProgress) {
       return currentWorkout;
+    }
 
     _clearSetProgress();
     final Workout startedWorkout = currentWorkout.copyWith(

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -85,8 +87,10 @@ class TodayScreen extends ConsumerWidget {
                                       startedWorkout == null) {
                                     return;
                                   }
-                                  context.pushNamed(
-                                    AppRoute.workoutOverview.name,
+                                  unawaited(
+                                    context.pushNamed(
+                                      AppRoute.workoutOverview.name,
+                                    ),
                                   );
                                 },
                           child: Text(
