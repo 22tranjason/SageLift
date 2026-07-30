@@ -449,7 +449,7 @@ void main() {
     expect(find.text('Finish time'), findsOneWidget);
     expect(find.text('Exercises completed'), findsOneWidget);
     expect(find.text('Completed exercises'), findsOneWidget);
-    expect(find.text('Barbell Bench Press'), findsNWidgets(2));
+    expect(find.text('Barbell Bench Press'), findsOneWidget);
     expect(find.text('Completed sets'), findsOneWidget);
     expect(find.text('80 kg × 10 reps'), findsOneWidget);
   });
