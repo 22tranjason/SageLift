@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sagelift/app/sagelift_app.dart';
@@ -66,11 +65,8 @@ void main() {
     expect(find.text('Incline Dumbbell Press'), findsOneWidget);
     expect(find.text('Start Workout'), findsOneWidget);
 
-    final Finder startWorkoutButton = find.widgetWithText(
-      FilledButton,
-      'Start Workout',
-    );
-    await tester.ensureVisible(find.text('Start Workout'));
+    final Finder startWorkoutButton = find.text('Start Workout');
+    await tester.ensureVisible(startWorkoutButton);
     await tester.pumpAndSettle();
     await tester.tap(startWorkoutButton);
     await tester.pumpAndSettle();
