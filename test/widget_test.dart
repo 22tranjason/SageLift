@@ -30,8 +30,8 @@ void main() {
       name: 'Push A',
       scheduledDate: DateTime.utc(2000),
       status: WorkoutStatus.planned,
-      exerciseIds: const <String>[benchPress.id, inclinePress.id],
-      sets: const <WorkoutSet>[
+      exerciseIds: <String>[benchPress.id, inclinePress.id],
+      sets: <WorkoutSet>[
         WorkoutSet(
           id: 'seed-set-push-a-bench-1',
           exerciseId: benchPress.id,
