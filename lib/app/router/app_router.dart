@@ -2,8 +2,8 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../features/workouts/presentation/screens/today_screen.dart';
 import '../../features/workouts/presentation/screens/exercise_screen.dart';
+import '../../features/workouts/presentation/screens/today_screen.dart';
 import '../../features/workouts/presentation/screens/workout_overview_screen.dart';
 
 /// Named routes form the public navigation contract between features.
