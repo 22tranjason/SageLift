@@ -8,6 +8,7 @@ import 'features/workouts/data/local/workout_hive_store.dart';
 import 'features/workouts/data/repositories/hive_exercise_repository.dart';
 import 'features/workouts/data/repositories/hive_workout_repository.dart';
 import 'features/workouts/data/services/workout_seed_service.dart';
+import 'features/workouts/presentation/providers/today_workout_provider.dart';
 
 /// Starts the app after its offline storage dependency is ready.
 Future<void> main() async {
@@ -15,14 +16,22 @@ Future<void> main() async {
   final HiveLocalKeyValueStore localStore = HiveLocalKeyValueStore();
   await localStore.initialize();
   final WorkoutHiveStore workoutStore = await WorkoutHiveStore.open();
+  final HiveExerciseRepository exerciseRepository = HiveExerciseRepository(
+    workoutStore.exerciseBox,
+  );
+  final HiveWorkoutRepository workoutRepository = HiveWorkoutRepository(
+    workoutStore.workoutBox,
+  );
   await WorkoutSeedService(
-    exerciseRepository: HiveExerciseRepository(workoutStore.exerciseBox),
-    workoutRepository: HiveWorkoutRepository(workoutStore.workoutBox),
+    exerciseRepository: exerciseRepository,
+    workoutRepository: workoutRepository,
   ).seedIfEmpty();
   runApp(
     ProviderScope(
       overrides: <Override>[
-        keyValueStoreProvider.overrideWithValue(localStore)
+        keyValueStoreProvider.overrideWithValue(localStore),
+        exerciseRepositoryProvider.overrideWithValue(exerciseRepository),
+        workoutRepositoryProvider.overrideWithValue(workoutRepository),
       ],
       child: const SageLiftApp(),
     ),
