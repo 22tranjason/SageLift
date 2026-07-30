@@ -23,7 +23,17 @@ class TodayScreen extends ConsumerWidget {
     final DateTime now = DateTime.now();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Today')),
+      appBar: AppBar(
+        title: const Text('Today'),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () {
+              unawaited(context.pushNamed(AppRoute.workoutHistory.name));
+            },
+            child: const Text('History'),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),

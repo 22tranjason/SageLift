@@ -8,6 +8,7 @@ import '../../domain/models/workout.dart';
 import '../../domain/models/workout_set.dart';
 import '../providers/today_workout_provider.dart';
 import '../providers/workout_completion_controller.dart';
+import '../providers/workout_history_provider.dart';
 import '../providers/workout_set_progress_controller.dart';
 
 /// Focused set-entry screen for one exercise in the selected workout.
@@ -83,6 +84,8 @@ class _ExerciseContent extends ConsumerWidget {
     final WorkoutSetProgressController controller = ref.read(
       workoutSetProgressControllerProvider.notifier,
     );
+    final AsyncValue<PreviousExercisePerformance?> previousPerformance =
+        ref.watch(previousExercisePerformanceProvider(exercise.id));
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -93,6 +96,19 @@ class _ExerciseContent extends ConsumerWidget {
           const SizedBox(height: 8),
           if (sets.isNotEmpty && sets.first.notes != null)
             Text(sets.first.notes!),
+          const SizedBox(height: 16),
+          previousPerformance.when(
+            loading: () => const SizedBox.shrink(),
+            error: (Object error, StackTrace stackTrace) {
+              return const Text('No previous workout.');
+            },
+            data: (PreviousExercisePerformance? performance) {
+              if (performance == null) {
+                return const Text('No previous workout.');
+              }
+              return _PreviousPerformanceCard(performance: performance);
+            },
+          ),
           const SizedBox(height: 16),
           for (final WorkoutSet set in sets) ...<Widget>[
             _SetEntryCard(
@@ -173,6 +189,36 @@ class _ExerciseContent extends ConsumerWidget {
       AppRoute.exercise.name,
       pathParameters: <String, String>{'index': '$index'},
     );
+  }
+}
+
+class _PreviousPerformanceCard extends StatelessWidget {
+  const _PreviousPerformanceCard({required this.performance});
+
+  final PreviousExercisePerformance performance;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            const Text('Last workout:'),
+            const SizedBox(height: 8),
+            for (final WorkoutSet set in performance.sets)
+              Text('Set ${set.setNumber}: ${_setLabel(set)}'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _setLabel(WorkoutSet set) {
+    final String weight = set.weightKg?.toStringAsFixed(0) ?? '—';
+    final String reps = set.reps?.toString() ?? '—';
+    return '$weight kg × $reps reps';
   }
 }
 

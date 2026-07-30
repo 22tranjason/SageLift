@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/workouts/presentation/screens/exercise_screen.dart';
 import '../../features/workouts/presentation/screens/today_screen.dart';
+import '../../features/workouts/presentation/screens/workout_details_screen.dart';
+import '../../features/workouts/presentation/screens/workout_history_screen.dart';
 import '../../features/workouts/presentation/screens/workout_overview_screen.dart';
 import '../../features/workouts/presentation/screens/workout_summary_screen.dart';
 
@@ -20,6 +22,12 @@ enum AppRoute {
 
   /// A persisted summary route identified by its workout ID.
   workoutSummary,
+
+  /// The completed workout history route.
+  workoutHistory,
+
+  /// A completed workout's persisted detail route identified by its ID.
+  workoutDetails,
 }
 
 /// Owns navigation configuration so features never instantiate routers directly.
@@ -56,6 +64,22 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((Ref ref) {
         name: AppRoute.workoutSummary.name,
         builder: (BuildContext context, GoRouterState state) {
           return WorkoutSummaryScreen(
+            workoutId: state.pathParameters['id'] ?? '',
+          );
+        },
+      ),
+      GoRoute(
+        path: '/history',
+        name: AppRoute.workoutHistory.name,
+        builder: (BuildContext context, GoRouterState state) {
+          return const WorkoutHistoryScreen();
+        },
+      ),
+      GoRoute(
+        path: '/history/:id',
+        name: AppRoute.workoutDetails.name,
+        builder: (BuildContext context, GoRouterState state) {
+          return WorkoutDetailsScreen(
             workoutId: state.pathParameters['id'] ?? '',
           );
         },

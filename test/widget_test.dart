@@ -150,6 +150,7 @@ void main() {
     expect(find.text('Barbell Bench Press'), findsOneWidget);
     expect(find.text('Set 1'), findsOneWidget);
     expect(find.text('Set 2'), findsOneWidget);
+    expect(find.text('No previous workout.'), findsOneWidget);
     expect(find.text('Target reps: 10'), findsNWidgets(2));
     expect(find.text('Target 6–10 reps; rest 2–3 min'), findsOneWidget);
     expect(
@@ -354,6 +355,199 @@ void main() {
     expect(find.text('Completed'), findsOneWidget);
     expect(find.text('Workout completed'), findsOneWidget);
   });
+
+  testWidgets('History shows an empty state without completed workouts', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: <Override>[
+          keyValueStoreProvider.overrideWithValue(_InMemoryKeyValueStore()),
+          exerciseRepositoryProvider.overrideWithValue(
+            _FakeExerciseRepository(const <Exercise>[]),
+          ),
+          workoutRepositoryProvider.overrideWithValue(
+            _FakeWorkoutRepository(const <Workout>[]),
+          ),
+        ],
+        child: const SageLiftApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('History'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('No completed workouts yet.'), findsOneWidget);
+  });
+
+  testWidgets('History orders workouts and displays recorded workout details', (
+    WidgetTester tester,
+  ) async {
+    const Exercise benchPress = Exercise(
+      id: 'history-bench-press',
+      name: 'Barbell Bench Press',
+      category: ExerciseCategory.strength,
+      equipment: Equipment.barbell,
+    );
+    final Workout olderWorkout = _completedWorkout(
+      id: 'history-older',
+      name: 'Older Push',
+      exerciseId: benchPress.id,
+      startedAt: DateTime.utc(2026, 7, 28, 6),
+      completedAt: DateTime.utc(2026, 7, 28, 6, 20),
+      weightKg: 70,
+      reps: 8,
+    );
+    final Workout newerWorkout = _completedWorkout(
+      id: 'history-newer',
+      name: 'Newer Push',
+      exerciseId: benchPress.id,
+      startedAt: DateTime.utc(2026, 7, 30, 6),
+      completedAt: DateTime.utc(2026, 7, 30, 6, 30),
+      weightKg: 80,
+      reps: 10,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: <Override>[
+          keyValueStoreProvider.overrideWithValue(_InMemoryKeyValueStore()),
+          exerciseRepositoryProvider.overrideWithValue(
+            _FakeExerciseRepository(<Exercise>[benchPress]),
+          ),
+          workoutRepositoryProvider.overrideWithValue(
+            _FakeWorkoutRepository(<Workout>[olderWorkout, newerWorkout]),
+          ),
+        ],
+        child: const SageLiftApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('History'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Newer Push'), findsOneWidget);
+    expect(find.text('Older Push'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text('Newer Push')).dy,
+      lessThan(tester.getTopLeft(find.text('Older Push')).dy),
+    );
+    expect(find.text('Duration: 30 min'), findsOneWidget);
+    expect(find.text('Sets: 1 • Reps: 10'), findsOneWidget);
+    expect(find.text('Volume: 800 kg'), findsOneWidget);
+
+    await tester.tap(
+      find.byKey(const ValueKey<String>('history-workout-history-newer')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Workout Details'), findsOneWidget);
+    expect(find.text('Newer Push'), findsOneWidget);
+    expect(find.text('Start time'), findsOneWidget);
+    expect(find.text('Finish time'), findsOneWidget);
+    expect(find.text('Exercises completed'), findsOneWidget);
+    expect(find.text('Completed exercises'), findsOneWidget);
+    expect(find.text('Barbell Bench Press'), findsNWidgets(2));
+    expect(find.text('Completed sets'), findsOneWidget);
+    expect(find.text('80 kg × 10 reps'), findsOneWidget);
+  });
+
+  testWidgets('Exercise shows its most recent persisted previous performance', (
+    WidgetTester tester,
+  ) async {
+    const Exercise benchPress = Exercise(
+      id: 'previous-bench-press',
+      name: 'Barbell Bench Press',
+      category: ExerciseCategory.strength,
+      equipment: Equipment.barbell,
+    );
+    final Workout activeWorkout = Workout(
+      id: 'active-workout',
+      name: 'Today Push',
+      scheduledDate: DateTime.utc(2026, 7, 30),
+      status: WorkoutStatus.planned,
+      exerciseIds: <String>[benchPress.id],
+      sets: <WorkoutSet>[
+        WorkoutSet(
+          id: 'active-set',
+          exerciseId: benchPress.id,
+          setNumber: 1,
+          targetReps: 10,
+          status: WorkoutSetStatus.planned,
+        ),
+      ],
+    );
+    final Workout previousWorkout = _completedWorkout(
+      id: 'previous-workout',
+      name: 'Previous Push',
+      exerciseId: benchPress.id,
+      startedAt: DateTime.utc(2026, 7, 28, 6),
+      completedAt: DateTime.utc(2026, 7, 28, 6, 30),
+      weightKg: 75,
+      reps: 9,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: <Override>[
+          keyValueStoreProvider.overrideWithValue(_InMemoryKeyValueStore()),
+          exerciseRepositoryProvider.overrideWithValue(
+            _FakeExerciseRepository(<Exercise>[benchPress]),
+          ),
+          workoutRepositoryProvider.overrideWithValue(
+            _FakeWorkoutRepository(<Workout>[activeWorkout, previousWorkout]),
+          ),
+        ],
+        child: const SageLiftApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Start Workout'));
+    await tester.tap(find.text('Start Workout'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Barbell Bench Press'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Last workout:'), findsOneWidget);
+    expect(find.text('Set 1: 75 kg × 9 reps'), findsOneWidget);
+  });
+}
+
+Workout _completedWorkout({
+  required String id,
+  required String name,
+  required String exerciseId,
+  required DateTime startedAt,
+  required DateTime completedAt,
+  required double weightKg,
+  required int reps,
+}) {
+  return Workout(
+    id: id,
+    name: name,
+    scheduledDate: DateTime.utc(
+      completedAt.year,
+      completedAt.month,
+      completedAt.day,
+    ),
+    status: WorkoutStatus.completed,
+    exerciseIds: <String>[exerciseId],
+    sets: <WorkoutSet>[
+      WorkoutSet(
+        id: '$id-set-1',
+        exerciseId: exerciseId,
+        setNumber: 1,
+        weightKg: weightKg,
+        reps: reps,
+        status: WorkoutSetStatus.completed,
+      ),
+    ],
+    startedAt: startedAt,
+    completedAt: completedAt,
+  );
 }
 
 class _InMemoryKeyValueStore implements KeyValueStore {
