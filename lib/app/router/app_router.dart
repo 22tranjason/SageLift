@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/workouts/presentation/screens/exercise_screen.dart';
 import '../../features/workouts/presentation/screens/today_screen.dart';
 import '../../features/workouts/presentation/screens/workout_overview_screen.dart';
+import '../../features/workouts/presentation/screens/workout_summary_screen.dart';
 
 /// Named routes form the public navigation contract between features.
 enum AppRoute {
@@ -16,6 +17,9 @@ enum AppRoute {
 
   /// A focused exercise route identified by its ordered workout index.
   exercise,
+
+  /// A persisted summary route identified by its workout ID.
+  workoutSummary,
 }
 
 /// Owns navigation configuration so features never instantiate routers directly.
@@ -45,6 +49,15 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((Ref ref) {
             state.pathParameters['index'] ?? '',
           );
           return ExerciseScreen(exerciseIndex: exerciseIndex ?? -1);
+        },
+      ),
+      GoRoute(
+        path: '/workout-summary/:id',
+        name: AppRoute.workoutSummary.name,
+        builder: (BuildContext context, GoRouterState state) {
+          return WorkoutSummaryScreen(
+            workoutId: state.pathParameters['id'] ?? '',
+          );
         },
       ),
     ],

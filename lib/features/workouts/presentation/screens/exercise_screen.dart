@@ -4,8 +4,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/app_router.dart';
 import '../../domain/models/exercise.dart';
+import '../../domain/models/workout.dart';
 import '../../domain/models/workout_set.dart';
 import '../providers/today_workout_provider.dart';
+import '../providers/workout_completion_controller.dart';
 import '../providers/workout_set_progress_controller.dart';
 
 /// Focused set-entry screen for one exercise in the selected workout.
@@ -45,6 +47,9 @@ class ExerciseScreen extends ConsumerWidget {
               sets: sets,
               exerciseIndex: exerciseIndex,
               exerciseCount: workoutData.exercises.length,
+              workoutId: workoutData.workout.id,
+              workoutIsCompleted:
+                  workoutData.workout.status == WorkoutStatus.completed,
             );
           },
         ),
@@ -59,12 +64,16 @@ class _ExerciseContent extends ConsumerWidget {
     required this.sets,
     required this.exerciseIndex,
     required this.exerciseCount,
+    required this.workoutId,
+    required this.workoutIsCompleted,
   });
 
   final Exercise exercise;
   final List<WorkoutSet> sets;
   final int exerciseIndex;
   final int exerciseCount;
+  final String workoutId;
+  final bool workoutIsCompleted;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -126,6 +135,27 @@ class _ExerciseContent extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 12),
+          if (exerciseIndex == exerciseCount - 1 &&
+              !workoutIsCompleted) ...<Widget>[
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                key: const ValueKey<String>('finish-workout-button'),
+                onPressed: () async {
+                  final Workout? completedWorkout = await ref
+                      .read(workoutCompletionControllerProvider)
+                      .finishWorkout(workoutId);
+                  if (!context.mounted || completedWorkout == null) return;
+                  context.goNamed(
+                    AppRoute.workoutSummary.name,
+                    pathParameters: <String, String>{'id': workoutId},
+                  );
+                },
+                child: const Text('Finish Workout'),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           SizedBox(
             width: double.infinity,
             child: TextButton(

@@ -135,6 +135,42 @@ void main() {
       contains(workout),
     );
   });
+
+  test('persists completed workout records with their recorded sets', () async {
+    final WorkoutHiveStore store = await WorkoutHiveStore.open();
+    final HiveWorkoutRepository workoutRepository = HiveWorkoutRepository(
+      store.workoutBox,
+    );
+    final DateTime startedAt = DateTime.utc(2026, 7, 30, 6, 15);
+    final DateTime completedAt = DateTime.utc(2026, 7, 30, 7, 5);
+    final Workout completedWorkout = Workout(
+      id: 'completed-workout-1',
+      name: 'Completed workout',
+      scheduledDate: DateTime.utc(2026, 7, 30),
+      status: WorkoutStatus.completed,
+      exerciseIds: const <String>['exercise-1'],
+      sets: const <WorkoutSet>[
+        WorkoutSet(
+          id: 'completed-set-1',
+          exerciseId: 'exercise-1',
+          setNumber: 1,
+          weightKg: 80,
+          reps: 10,
+          targetReps: 10,
+          status: WorkoutSetStatus.completed,
+        ),
+      ],
+      startedAt: startedAt,
+      completedAt: completedAt,
+    );
+
+    await workoutRepository.save(completedWorkout);
+
+    expect(
+      await workoutRepository.getById(completedWorkout.id),
+      completedWorkout,
+    );
+  });
 }
 
 const List<_ExpectedWorkout> _expectedWorkouts = <_ExpectedWorkout>[

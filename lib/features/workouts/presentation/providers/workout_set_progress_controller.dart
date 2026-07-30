@@ -61,6 +61,11 @@ class WorkoutSetProgressController
     _update(setId, _valueFor(setId).copyWith(isCompleted: isCompleted));
   }
 
+  /// Removes entries from the previously active workout.
+  void clear() {
+    state = <String, WorkoutSetProgress>{};
+  }
+
   WorkoutSetProgress _valueFor(String setId) {
     return state[setId] ?? const WorkoutSetProgress();
   }

@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/app_router.dart';
+import '../../domain/models/workout.dart';
 import '../providers/today_workout_provider.dart';
+import '../providers/workout_completion_controller.dart';
 import '../widgets/workout_exercise_list.dart';
 
 /// The first-use daily dashboard for workouts and health targets.
@@ -54,6 +56,8 @@ class TodayScreen extends ConsumerWidget {
                   if (workoutData == null) {
                     return const Text('No workout is available yet.');
                   }
+                  final bool isCompleted =
+                      workoutData.workout.status == WorkoutStatus.completed;
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
@@ -61,16 +65,33 @@ class TodayScreen extends ConsumerWidget {
                         workoutData.workout.name,
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
+                      if (isCompleted) ...<Widget>[
+                        const SizedBox(height: 4),
+                        const Text('Completed'),
+                      ],
                       const SizedBox(height: 8),
                       WorkoutExerciseList(exercises: workoutData.exercises),
                       const SizedBox(height: 16),
                       SizedBox(
                         width: double.infinity,
                         child: FilledButton(
-                          onPressed: () {
-                            context.pushNamed(AppRoute.workoutOverview.name);
-                          },
-                          child: const Text('Start Workout'),
+                          onPressed: isCompleted
+                              ? null
+                              : () async {
+                                  final Workout? startedWorkout = await ref
+                                      .read(workoutCompletionControllerProvider)
+                                      .startWorkout(workoutData.workout);
+                                  if (!context.mounted ||
+                                      startedWorkout == null) {
+                                    return;
+                                  }
+                                  context.pushNamed(
+                                    AppRoute.workoutOverview.name,
+                                  );
+                                },
+                          child: Text(
+                            isCompleted ? 'Workout completed' : 'Start Workout',
+                          ),
                         ),
                       ),
                     ],

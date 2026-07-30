@@ -227,6 +227,133 @@ void main() {
       isTrue,
     );
   });
+
+  testWidgets('finishing a workout persists it and shows accurate summary data',
+      (
+    WidgetTester tester,
+  ) async {
+    const Exercise benchPress = Exercise(
+      id: 'completion-bench-press',
+      name: 'Barbell Bench Press',
+      category: ExerciseCategory.strength,
+      equipment: Equipment.barbell,
+    );
+    const Exercise row = Exercise(
+      id: 'completion-row',
+      name: 'Barbell Row',
+      category: ExerciseCategory.strength,
+      equipment: Equipment.barbell,
+    );
+    final Workout workout = Workout(
+      id: 'completion-push-a',
+      name: 'Push A',
+      scheduledDate: DateTime.utc(2026, 7, 30),
+      status: WorkoutStatus.planned,
+      exerciseIds: <String>[benchPress.id, row.id],
+      sets: <WorkoutSet>[
+        WorkoutSet(
+          id: 'completion-bench-1',
+          exerciseId: benchPress.id,
+          setNumber: 1,
+          targetReps: 10,
+          status: WorkoutSetStatus.planned,
+        ),
+        WorkoutSet(
+          id: 'completion-row-1',
+          exerciseId: row.id,
+          setNumber: 1,
+          targetReps: 8,
+          status: WorkoutSetStatus.planned,
+        ),
+      ],
+    );
+    final _FakeWorkoutRepository workoutRepository = _FakeWorkoutRepository(
+      <Workout>[workout],
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: <Override>[
+          keyValueStoreProvider.overrideWithValue(_InMemoryKeyValueStore()),
+          exerciseRepositoryProvider.overrideWithValue(
+            _FakeExerciseRepository(<Exercise>[benchPress, row]),
+          ),
+          workoutRepositoryProvider.overrideWithValue(workoutRepository),
+        ],
+        child: const SageLiftApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Start Workout'));
+    await tester.tap(find.text('Start Workout'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Barbell Bench Press'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Finish Workout'), findsNothing);
+
+    await tester.enterText(
+      find.byKey(const ValueKey<String>('weight-completion-bench-1')),
+      '80',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey<String>('reps-completion-bench-1')),
+      '10',
+    );
+    await tester.tap(
+      find.byKey(const ValueKey<String>('completed-completion-bench-1')),
+    );
+    await tester.ensureVisible(find.text('Next Exercise'));
+    await tester.tap(find.text('Next Exercise'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Finish Workout'), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const ValueKey<String>('weight-completion-row-1')),
+      '50',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey<String>('reps-completion-row-1')),
+      '8',
+    );
+    await tester.tap(
+      find.byKey(const ValueKey<String>('completed-completion-row-1')),
+    );
+    await tester.ensureVisible(find.text('Finish Workout'));
+    await tester.tap(
+      find.byKey(const ValueKey<String>('finish-workout-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Workout Summary'), findsOneWidget);
+    expect(find.text('Exercises completed'), findsOneWidget);
+    expect(find.text('2'), findsNWidgets(2));
+    expect(find.text('Sets completed'), findsOneWidget);
+    expect(find.text('Total reps'), findsOneWidget);
+    expect(find.text('18'), findsOneWidget);
+    expect(find.text('Total volume'), findsOneWidget);
+    expect(find.text('1200 kg'), findsOneWidget);
+    expect(find.text('Barbell Bench Press'), findsOneWidget);
+    expect(find.text('Barbell Row'), findsOneWidget);
+
+    final Workout? completedWorkout = await workoutRepository.getById(
+      workout.id,
+    );
+    expect(completedWorkout?.status, WorkoutStatus.completed);
+    expect(completedWorkout?.startedAt, isNotNull);
+    expect(completedWorkout?.completedAt, isNotNull);
+    expect(completedWorkout?.sets[0].weightKg, 80);
+    expect(completedWorkout?.sets[0].reps, 10);
+
+    await tester.ensureVisible(find.text('Done'));
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Today'), findsOneWidget);
+    expect(find.text('Completed'), findsOneWidget);
+    expect(find.text('Workout completed'), findsOneWidget);
+  });
 }
 
 class _InMemoryKeyValueStore implements KeyValueStore {
