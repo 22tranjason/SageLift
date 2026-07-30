@@ -65,7 +65,13 @@ void main() {
     expect(find.text('Incline Dumbbell Press'), findsOneWidget);
     expect(find.text('Start Workout'), findsOneWidget);
 
-    await tester.tap(find.text('Start Workout'));
+    final Finder startWorkoutButton = find.widgetWithText(
+      FilledButton,
+      'Start Workout',
+    );
+    await tester.ensureVisible(startWorkoutButton);
+    await tester.pumpAndSettle();
+    await tester.tap(startWorkoutButton);
     await tester.pumpAndSettle();
 
     expect(find.text('Workout Overview'), findsOneWidget);
