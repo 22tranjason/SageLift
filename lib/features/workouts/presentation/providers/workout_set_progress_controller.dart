@@ -5,29 +5,27 @@ class WorkoutSetProgress {
   /// Creates values for a workout set.
   const WorkoutSetProgress({
     this.weight = '',
-    this.completedReps = '',
-    this.isCompleted = false,
+    this.reps = '',
   });
 
   /// Entered weight value, retained as text until persistence is introduced.
   final String weight;
 
-  /// Entered completed repetitions, retained as text until persistence is introduced.
-  final String completedReps;
+  /// Entered repetitions, retained as text until persistence is introduced.
+  final String reps;
 
-  /// Whether the user has marked this set complete.
-  final bool isCompleted;
+  /// Whether at least one performance value has been entered for this set.
+  bool get hasRecordedValues =>
+      weight.trim().isNotEmpty || reps.trim().isNotEmpty;
 
   /// Returns this progress with selected fields replaced.
   WorkoutSetProgress copyWith({
     String? weight,
-    String? completedReps,
-    bool? isCompleted,
+    String? reps,
   }) {
     return WorkoutSetProgress(
       weight: weight ?? this.weight,
-      completedReps: completedReps ?? this.completedReps,
-      isCompleted: isCompleted ?? this.isCompleted,
+      reps: reps ?? this.reps,
     );
   }
 }
@@ -51,14 +49,9 @@ class WorkoutSetProgressController
     _update(setId, _valueFor(setId).copyWith(weight: weight));
   }
 
-  /// Records completed repetitions for [setId].
-  void updateCompletedReps(String setId, String completedReps) {
-    _update(setId, _valueFor(setId).copyWith(completedReps: completedReps));
-  }
-
-  /// Marks [setId] as completed or incomplete.
-  void updateCompletion(String setId, bool isCompleted) {
-    _update(setId, _valueFor(setId).copyWith(isCompleted: isCompleted));
+  /// Records entered repetitions for [setId].
+  void updateReps(String setId, String reps) {
+    _update(setId, _valueFor(setId).copyWith(reps: reps));
   }
 
   /// Removes entries from the previously active workout.

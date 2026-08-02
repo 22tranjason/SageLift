@@ -151,8 +151,10 @@ void main() {
     expect(find.text('Set 1'), findsOneWidget);
     expect(find.text('Set 2'), findsOneWidget);
     expect(find.text('No previous workout.'), findsOneWidget);
-    expect(find.text('Target reps: 10'), findsNWidgets(2));
-    expect(find.text('Target 6–10 reps; rest 2–3 min'), findsOneWidget);
+    expect(find.text('Target reps: 10'), findsNothing);
+    expect(find.byType(CheckboxListTile), findsNothing);
+    expect(find.text('Reps'), findsNWidgets(2));
+    expect(find.text('6–10'), findsNWidgets(2));
     expect(
       tester
           .widget<OutlinedButton>(
@@ -170,9 +172,6 @@ void main() {
       find.byKey(const ValueKey<String>('reps-bench-1')),
       '10',
     );
-    await tester.tap(
-      find.byKey(const ValueKey<String>('completed-bench-1')),
-    );
     await tester.pumpAndSettle();
 
     await tester.ensureVisible(find.text('Next Exercise'));
@@ -180,7 +179,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Incline Dumbbell Press'), findsOneWidget);
-    expect(find.text('Target reps: 12'), findsOneWidget);
+    expect(find.text('Target reps: 12'), findsNothing);
     expect(
       tester
           .widget<OutlinedButton>(
@@ -218,14 +217,6 @@ void main() {
           )
           .initialValue,
       '10',
-    );
-    expect(
-      tester
-          .widget<CheckboxListTile>(
-            find.byKey(const ValueKey<String>('completed-bench-1')),
-          )
-          .value,
-      isTrue,
     );
   });
 
@@ -302,9 +293,6 @@ void main() {
       find.byKey(const ValueKey<String>('reps-completion-bench-1')),
       '10',
     );
-    await tester.tap(
-      find.byKey(const ValueKey<String>('completed-completion-bench-1')),
-    );
     await tester.ensureVisible(find.text('Next Exercise'));
     await tester.tap(find.text('Next Exercise'));
     await tester.pumpAndSettle();
@@ -317,9 +305,6 @@ void main() {
     await tester.enterText(
       find.byKey(const ValueKey<String>('reps-completion-row-1')),
       '8',
-    );
-    await tester.tap(
-      find.byKey(const ValueKey<String>('completed-completion-row-1')),
     );
     await tester.ensureVisible(find.text('Finish Workout'));
     await tester.tap(
@@ -511,8 +496,9 @@ void main() {
     await tester.tap(find.text('Barbell Bench Press'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Last workout:'), findsOneWidget);
-    expect(find.text('Set 1: 75 kg × 9 reps'), findsOneWidget);
+    expect(find.text('Last time'), findsOneWidget);
+    expect(find.text('75 kg × 9 reps'), findsOneWidget);
+    expect(find.text('Let\'s beat that 💪'), findsOneWidget);
   });
 }
 

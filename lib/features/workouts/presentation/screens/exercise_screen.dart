@@ -26,7 +26,7 @@ class ExerciseScreen extends ConsumerWidget {
     );
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Exercise')),
+      appBar: AppBar(),
       body: SafeArea(
         child: todayWorkout.when(
           loading: () => const Center(child: CircularProgressIndicator()),
@@ -86,6 +86,9 @@ class _ExerciseContent extends ConsumerWidget {
     );
     final AsyncValue<PreviousExercisePerformance?> previousPerformance =
         ref.watch(previousExercisePerformanceProvider(exercise.id));
+    final String? repRange = sets.isEmpty ? null : _repRangeFor(sets.first);
+    final String? restGuidance =
+        sets.isEmpty ? null : _restGuidanceFor(sets.first);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -93,10 +96,15 @@ class _ExerciseContent extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(exercise.name, style: Theme.of(context).textTheme.headlineSmall),
+          if (repRange != null || restGuidance != null)
+            Text(
+              <String>[
+                if (repRange != null) '$repRange reps',
+                if (restGuidance != null) restGuidance,
+              ].join(' • '),
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
           const SizedBox(height: 8),
-          if (sets.isNotEmpty && sets.first.notes != null)
-            Text(sets.first.notes!),
-          const SizedBox(height: 16),
           previousPerformance.when(
             loading: () => const SizedBox.shrink(),
             error: (Object error, StackTrace stackTrace) {
@@ -109,22 +117,20 @@ class _ExerciseContent extends ConsumerWidget {
               return _PreviousPerformanceCard(performance: performance);
             },
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
           for (final WorkoutSet set in sets) ...<Widget>[
             _SetEntryCard(
               set: set,
+              repRange: _repRangeFor(set),
               progress: progress[set.id] ?? const WorkoutSetProgress(),
               onWeightChanged: (String weight) {
                 controller.updateWeight(set.id, weight);
               },
-              onCompletedRepsChanged: (String completedReps) {
-                controller.updateCompletedReps(set.id, completedReps);
-              },
-              onCompletionChanged: (bool isCompleted) {
-                controller.updateCompletion(set.id, isCompleted);
+              onRepsChanged: (String reps) {
+                controller.updateReps(set.id, reps);
               },
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
           ],
           const SizedBox(height: 8),
           Row(
@@ -192,6 +198,25 @@ class _ExerciseContent extends ConsumerWidget {
   }
 }
 
+String? _repRangeFor(WorkoutSet set) {
+  final RegExpMatch? match = RegExp(
+    r'(\d+\s*[–-]\s*\d+)\s*reps',
+    caseSensitive: false,
+  ).firstMatch(set.notes ?? '');
+  if (match != null) {
+    return match.group(1)?.replaceAll('-', '–').replaceAll(' ', '');
+  }
+  return set.targetReps?.toString();
+}
+
+String? _restGuidanceFor(WorkoutSet set) {
+  final RegExpMatch? match = RegExp(
+    r'rest\s+[^;]+',
+    caseSensitive: false,
+  ).firstMatch(set.notes ?? '');
+  return match?.group(0);
+}
+
 class _PreviousPerformanceCard extends StatelessWidget {
   const _PreviousPerformanceCard({required this.performance});
 
@@ -201,14 +226,15 @@ class _PreviousPerformanceCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            const Text('Last workout:'),
-            const SizedBox(height: 8),
-            for (final WorkoutSet set in performance.sets)
-              Text('Set ${set.setNumber}: ${_setLabel(set)}'),
+            const Text('Last time'),
+            const SizedBox(height: 4),
+            for (final WorkoutSet set in performance.sets) Text(_setLabel(set)),
+            const SizedBox(height: 4),
+            const Text('Let\'s beat that 💪'),
           ],
         ),
       ),
@@ -225,29 +251,31 @@ class _PreviousPerformanceCard extends StatelessWidget {
 class _SetEntryCard extends StatelessWidget {
   const _SetEntryCard({
     required this.set,
+    required this.repRange,
     required this.progress,
     required this.onWeightChanged,
-    required this.onCompletedRepsChanged,
-    required this.onCompletionChanged,
+    required this.onRepsChanged,
   });
 
   final WorkoutSet set;
+  final String? repRange;
   final WorkoutSetProgress progress;
   final ValueChanged<String> onWeightChanged;
-  final ValueChanged<String> onCompletedRepsChanged;
-  final ValueChanged<bool> onCompletionChanged;
+  final ValueChanged<String> onRepsChanged;
 
   @override
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text('Set ${set.setNumber}'),
-            Text('Target reps: ${set.targetReps ?? '—'}'),
-            const SizedBox(height: 8),
+            Text(
+              'Set ${set.setNumber}',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 4),
             Row(
               children: <Widget>[
                 Expanded(
@@ -257,7 +285,10 @@ class _SetEntryCard extends StatelessWidget {
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
-                    decoration: const InputDecoration(labelText: 'Weight'),
+                    decoration: const InputDecoration(
+                      labelText: 'Weight',
+                      isDense: true,
+                    ),
                     onChanged: onWeightChanged,
                   ),
                 ),
@@ -265,24 +296,17 @@ class _SetEntryCard extends StatelessWidget {
                 Expanded(
                   child: TextFormField(
                     key: ValueKey<String>('reps-${set.id}'),
-                    initialValue: progress.completedReps,
+                    initialValue: progress.reps,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Completed reps',
+                    decoration: InputDecoration(
+                      labelText: 'Reps',
+                      hintText: repRange,
+                      isDense: true,
                     ),
-                    onChanged: onCompletedRepsChanged,
+                    onChanged: onRepsChanged,
                   ),
                 ),
               ],
-            ),
-            CheckboxListTile(
-              key: ValueKey<String>('completed-${set.id}'),
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Completed'),
-              value: progress.isCompleted,
-              onChanged: (bool? value) {
-                onCompletionChanged(value ?? false);
-              },
             ),
           ],
         ),
