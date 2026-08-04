@@ -155,6 +155,11 @@ void main() {
     expect(find.byType(CheckboxListTile), findsNothing);
     expect(find.text('Reps'), findsNWidgets(2));
     expect(find.text('6–10'), findsNWidgets(2));
+    expect(find.text('Suggested today'), findsOneWidget);
+    expect(
+      find.text('First session — choose a comfortable starting weight.'),
+      findsOneWidget,
+    );
     expect(
       tester
           .widget<OutlinedButton>(
@@ -320,8 +325,10 @@ void main() {
     expect(find.text('18'), findsOneWidget);
     expect(find.text('Total volume'), findsOneWidget);
     expect(find.text('1200 kg'), findsOneWidget);
-    expect(find.text('Barbell Bench Press'), findsOneWidget);
-    expect(find.text('Barbell Row'), findsOneWidget);
+    expect(find.text('Barbell Bench Press'), findsNWidgets(2));
+    expect(find.text('Barbell Row'), findsNWidgets(2));
+    expect(find.text('Progress since last time'), findsOneWidget);
+    expect(find.text('First session'), findsNWidgets(2));
 
     final Workout? completedWorkout = await workoutRepository.getById(
       workout.id,
@@ -461,6 +468,7 @@ void main() {
           setNumber: 1,
           targetReps: 10,
           status: WorkoutSetStatus.planned,
+          notes: 'Target 6–10 reps; rest 2 min',
         ),
       ],
     );
@@ -499,6 +507,26 @@ void main() {
     expect(find.text('Last time'), findsOneWidget);
     expect(find.text('75 kg × 9 reps'), findsOneWidget);
     expect(find.text('Let\'s beat that 💪'), findsOneWidget);
+    expect(find.text('Suggested today'), findsOneWidget);
+    expect(
+      find.text('Keep the same weight and add one rep where practical.'),
+      findsOneWidget,
+    );
+    expect(find.text('Set 1: 75 kg × 10 reps'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const ValueKey<String>('weight-active-set')),
+      '77',
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<TextFormField>(
+            find.byKey(const ValueKey<String>('weight-active-set')),
+          )
+          .initialValue,
+      '77',
+    );
   });
 }
 

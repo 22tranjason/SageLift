@@ -6,9 +6,11 @@ import '../../../../app/router/app_router.dart';
 import '../../domain/models/exercise.dart';
 import '../../domain/models/workout.dart';
 import '../../domain/models/workout_set.dart';
+import '../../domain/services/exercise_progression_service.dart';
 import '../providers/today_workout_provider.dart';
 import '../providers/workout_completion_controller.dart';
 import '../providers/workout_history_provider.dart';
+import '../providers/workout_progression_provider.dart';
 import '../providers/workout_set_progress_controller.dart';
 
 /// Focused set-entry screen for one exercise in the selected workout.
@@ -86,9 +88,20 @@ class _ExerciseContent extends ConsumerWidget {
     );
     final AsyncValue<PreviousExercisePerformance?> previousPerformance =
         ref.watch(previousExercisePerformanceProvider(exercise.id));
-    final String? repRange = sets.isEmpty ? null : _repRangeFor(sets.first);
+    final ExerciseProgressionService progressionService =
+        const ExerciseProgressionService();
+    final RepRange? repRange =
+        sets.isEmpty ? null : progressionService.repRangeFor(sets.first);
     final String? restGuidance =
-        sets.isEmpty ? null : _restGuidanceFor(sets.first);
+        sets.isEmpty ? null : progressionService.restGuidanceFor(sets.first);
+    final AsyncValue<ExerciseProgressionGuidance?> guidance = ref.watch(
+      exerciseProgressionGuidanceProvider(
+        ExerciseProgressionRequest(
+          workoutId: workoutId,
+          exerciseId: exercise.id,
+        ),
+      ),
+    );
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -99,7 +112,7 @@ class _ExerciseContent extends ConsumerWidget {
           if (repRange != null || restGuidance != null)
             Text(
               <String>[
-                if (repRange != null) '$repRange reps',
+                if (repRange != null) '${repRange.display} reps',
                 if (restGuidance != null) restGuidance,
               ].join(' • '),
               style: Theme.of(context).textTheme.bodySmall,
@@ -118,10 +131,21 @@ class _ExerciseContent extends ConsumerWidget {
             },
           ),
           const SizedBox(height: 8),
+          guidance.when(
+            loading: () => const SizedBox.shrink(),
+            error: (Object error, StackTrace stackTrace) {
+              return const SizedBox.shrink();
+            },
+            data: (ExerciseProgressionGuidance? value) {
+              if (value == null) return const SizedBox.shrink();
+              return _SuggestedTodayCard(guidance: value);
+            },
+          ),
+          const SizedBox(height: 8),
           for (final WorkoutSet set in sets) ...<Widget>[
             _SetEntryCard(
               set: set,
-              repRange: _repRangeFor(set),
+              repRange: progressionService.repRangeFor(set)?.display,
               progress: progress[set.id] ?? const WorkoutSetProgress(),
               onWeightChanged: (String weight) {
                 controller.updateWeight(set.id, weight);
@@ -198,25 +222,6 @@ class _ExerciseContent extends ConsumerWidget {
   }
 }
 
-String? _repRangeFor(WorkoutSet set) {
-  final RegExpMatch? match = RegExp(
-    r'(\d+\s*[–-]\s*\d+)\s*reps',
-    caseSensitive: false,
-  ).firstMatch(set.notes ?? '');
-  if (match != null) {
-    return match.group(1)?.replaceAll('-', '–').replaceAll(' ', '');
-  }
-  return set.targetReps?.toString();
-}
-
-String? _restGuidanceFor(WorkoutSet set) {
-  final RegExpMatch? match = RegExp(
-    r'rest\s+[^;]+',
-    caseSensitive: false,
-  ).firstMatch(set.notes ?? '');
-  return match?.group(0);
-}
-
 class _PreviousPerformanceCard extends StatelessWidget {
   const _PreviousPerformanceCard({required this.performance});
 
@@ -245,6 +250,43 @@ class _PreviousPerformanceCard extends StatelessWidget {
     final String weight = set.weightKg?.toStringAsFixed(0) ?? '—';
     final String reps = set.reps?.toString() ?? '—';
     return '$weight kg × $reps reps';
+  }
+}
+
+class _SuggestedTodayCard extends StatelessWidget {
+  const _SuggestedTodayCard({required this.guidance});
+
+  final ExerciseProgressionGuidance guidance;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            const Text('Suggested today'),
+            const SizedBox(height: 4),
+            Text(guidance.message),
+            const SizedBox(height: 4),
+            for (final SetProgressionSuggestion suggestion
+                in guidance.setSuggestions)
+              Text(_suggestionLabel(suggestion)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _suggestionLabel(SetProgressionSuggestion suggestion) {
+    final String reps = suggestion.targetReps == null
+        ? 'Use a comfortable rep target'
+        : '${suggestion.targetReps} reps';
+    final String weight = suggestion.suggestedWeightKg == null
+        ? ''
+        : '${suggestion.suggestedWeightKg!.toStringAsFixed(0)} kg × ';
+    return 'Set ${suggestion.setNumber}: $weight$reps';
   }
 }
 

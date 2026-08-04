@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/app_router.dart';
+import '../../domain/services/exercise_progression_service.dart';
 import '../providers/workout_completion_controller.dart';
+import '../providers/workout_progression_provider.dart';
 
 /// Presents the persisted result of a completed workout.
 class WorkoutSummaryScreen extends ConsumerWidget {
@@ -17,6 +19,9 @@ class WorkoutSummaryScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final AsyncValue<WorkoutSummary?> summary = ref.watch(
       workoutSummaryProvider(workoutId),
+    );
+    final AsyncValue<List<WorkoutExerciseProgression>> progressions = ref.watch(
+      workoutProgressionSummaryProvider(workoutId),
     );
 
     return Scaffold(
@@ -80,6 +85,36 @@ class WorkoutSummaryScreen extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 24),
+                  Text(
+                    'Progress since last time',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  progressions.when(
+                    loading: () => const SizedBox.shrink(),
+                    error: (Object error, StackTrace stackTrace) {
+                      return const SizedBox.shrink();
+                    },
+                    data: (List<WorkoutExerciseProgression> values) {
+                      if (values.isEmpty) return const SizedBox.shrink();
+                      return Card(
+                        child: Column(
+                          children: <Widget>[
+                            for (final WorkoutExerciseProgression progression
+                                in values)
+                              ListTile(
+                                title: Text(progression.exerciseName),
+                                subtitle: Text(progression.nextStep),
+                                trailing: Text(
+                                  _progressionLabel(progression.status),
+                                ),
+                              ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 24),
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton(
@@ -109,6 +144,21 @@ class WorkoutSummaryScreen extends ConsumerWidget {
 
   String _durationLabel(Duration duration) {
     return '${duration.inMinutes} min';
+  }
+
+  String _progressionLabel(ExerciseProgressionStatus status) {
+    switch (status) {
+      case ExerciseProgressionStatus.firstSession:
+        return 'First session';
+      case ExerciseProgressionStatus.improvedByWeight:
+        return 'Improved by weight';
+      case ExerciseProgressionStatus.improvedByReps:
+        return 'Improved by reps';
+      case ExerciseProgressionStatus.matched:
+        return 'Matched';
+      case ExerciseProgressionStatus.belowPrevious:
+        return 'Below previous';
+    }
   }
 }
 
