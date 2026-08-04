@@ -4,6 +4,7 @@ import '../../domain/models/exercise.dart';
 import '../../domain/models/workout.dart';
 import '../../domain/repositories/exercise_repository.dart';
 import '../../domain/repositories/workout_repository.dart';
+import '../../domain/services/workout_program.dart';
 
 /// Supplies the workout repository to workout presentation code.
 final Provider<WorkoutRepository> workoutRepositoryProvider =
@@ -19,7 +20,7 @@ final Provider<ExerciseRepository> exerciseRepositoryProvider =
       'ExerciseRepository must be provided during bootstrap.');
 });
 
-/// Loads the workout and ordered exercise list to show on the Today screen.
+/// Loads the active or next planned programme workout for the Today screen.
 final FutureProvider<TodayWorkout?> todayWorkoutProvider =
     FutureProvider<TodayWorkout?>((Ref ref) async {
   final WorkoutRepository workoutRepository = ref.watch(
@@ -28,15 +29,9 @@ final FutureProvider<TodayWorkout?> todayWorkoutProvider =
   final ExerciseRepository exerciseRepository = ref.watch(
     exerciseRepositoryProvider,
   );
-  final List<Workout> scheduledWorkouts = await workoutRepository.getForDate(
-    DateTime.now(),
-  );
-  final List<Workout> availableWorkouts = scheduledWorkouts.isNotEmpty
-      ? scheduledWorkouts
-      : await workoutRepository.getAll();
-  if (availableWorkouts.isEmpty) return null;
-
-  final Workout workout = availableWorkouts.first;
+  final List<Workout> workouts = await workoutRepository.getAll();
+  final Workout? workout = WorkoutProgram.nextIncompleteWorkout(workouts);
+  if (workout == null) return null;
   final List<Exercise> exercises = <Exercise>[];
   for (final String exerciseId in workout.exerciseIds) {
     final Exercise? exercise = await exerciseRepository.getById(exerciseId);
@@ -44,6 +39,27 @@ final FutureProvider<TodayWorkout?> todayWorkoutProvider =
   }
   return TodayWorkout(workout: workout, exercises: exercises);
 });
+
+/// Loads the most recently completed workout for the Today screen.
+final FutureProvider<Workout?> lastCompletedWorkoutProvider =
+    FutureProvider<Workout?>((Ref ref) async {
+  final WorkoutRepository workoutRepository = ref.watch(
+    workoutRepositoryProvider,
+  );
+  final List<Workout> completedWorkouts = (await workoutRepository.getAll())
+      .where((Workout workout) => workout.status == WorkoutStatus.completed)
+      .toList()
+    ..sort(_compareByCompletionDateDescending);
+  return completedWorkouts.isEmpty ? null : completedWorkouts.first;
+});
+
+int _compareByCompletionDateDescending(Workout first, Workout second) {
+  return _completionDate(second).compareTo(_completionDate(first));
+}
+
+DateTime _completionDate(Workout workout) {
+  return workout.completedAt ?? workout.startedAt ?? workout.scheduledDate;
+}
 
 /// Presentation-ready workout data with exercises retained in workout order.
 class TodayWorkout {

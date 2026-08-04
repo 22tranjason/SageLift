@@ -20,6 +20,9 @@ class TodayScreen extends ConsumerWidget {
     final AsyncValue<TodayWorkout?> todayWorkout = ref.watch(
       todayWorkoutProvider,
     );
+    final AsyncValue<Workout?> lastCompletedWorkout = ref.watch(
+      lastCompletedWorkoutProvider,
+    );
     final DateTime now = DateTime.now();
 
     return Scaffold(
@@ -55,21 +58,19 @@ class TodayScreen extends ConsumerWidget {
               const _DailyTargetsCard(),
               const SizedBox(height: 24),
               Text(
-                'Today\'s workout',
+                'Next Workout',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 8),
               todayWorkout.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (Object error, StackTrace stackTrace) {
-                  return const Text('Unable to load today\'s workout.');
+                  return const Text('Unable to load the next workout.');
                 },
                 data: (TodayWorkout? workoutData) {
                   if (workoutData == null) {
                     return const Text('No workout is available yet.');
                   }
-                  final bool isCompleted =
-                      workoutData.workout.status == WorkoutStatus.completed;
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
@@ -77,39 +78,40 @@ class TodayScreen extends ConsumerWidget {
                         workoutData.workout.name,
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
-                      if (isCompleted) ...<Widget>[
-                        const SizedBox(height: 4),
-                        const Text('Completed'),
-                      ],
                       const SizedBox(height: 8),
                       WorkoutExerciseList(exercises: workoutData.exercises),
                       const SizedBox(height: 16),
                       SizedBox(
                         width: double.infinity,
                         child: FilledButton(
-                          onPressed: isCompleted
-                              ? null
-                              : () async {
-                                  final Workout? startedWorkout = await ref
-                                      .read(workoutCompletionControllerProvider)
-                                      .startWorkout(workoutData.workout);
-                                  if (!context.mounted ||
-                                      startedWorkout == null) {
-                                    return;
-                                  }
-                                  unawaited(
-                                    context.pushNamed(
-                                      AppRoute.workoutOverview.name,
-                                    ),
-                                  );
-                                },
-                          child: Text(
-                            isCompleted ? 'Workout completed' : 'Start Workout',
-                          ),
+                          onPressed: () async {
+                            final Workout? startedWorkout = await ref
+                                .read(workoutCompletionControllerProvider)
+                                .startWorkout(workoutData.workout);
+                            if (!context.mounted || startedWorkout == null) {
+                              return;
+                            }
+                            unawaited(
+                              context.pushNamed(
+                                AppRoute.workoutOverview.name,
+                              ),
+                            );
+                          },
+                          child: const Text('Start Workout'),
                         ),
                       ),
                     ],
                   );
+                },
+              ),
+              lastCompletedWorkout.when(
+                loading: () => const SizedBox.shrink(),
+                error: (Object error, StackTrace stackTrace) {
+                  return const SizedBox.shrink();
+                },
+                data: (Workout? workout) {
+                  if (workout == null) return const SizedBox.shrink();
+                  return _LastWorkoutSection(workout: workout, now: now);
                 },
               ),
             ],
@@ -144,6 +146,49 @@ class TodayScreen extends ConsumerWidget {
       'December',
     ];
     return '${weekdays[date.weekday - 1]}, ${date.day} ${months[date.month - 1]}';
+  }
+}
+
+class _LastWorkoutSection extends StatelessWidget {
+  const _LastWorkoutSection({required this.workout, required this.now});
+
+  final Workout workout;
+  final DateTime now;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text('Last Workout', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.check),
+              title: Text(workout.name),
+              subtitle: Text('Completed ${_relativeDateLabel(workout, now)}'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _relativeDateLabel(Workout workout, DateTime now) {
+    final DateTime completedAt =
+        workout.completedAt ?? workout.startedAt ?? workout.scheduledDate;
+    final DateTime today = DateTime(now.year, now.month, now.day);
+    final DateTime completedDay = DateTime(
+      completedAt.year,
+      completedAt.month,
+      completedAt.day,
+    );
+    final int daysAgo = today.difference(completedDay).inDays;
+    if (daysAgo <= 0) return 'today';
+    if (daysAgo == 1) return 'yesterday';
+    return '$daysAgo days ago';
   }
 }
 

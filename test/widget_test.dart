@@ -65,6 +65,7 @@ void main() {
     expect(find.text('Barbell Bench Press'), findsOneWidget);
     expect(find.text('Incline Dumbbell Press'), findsOneWidget);
     expect(find.text('Start Workout'), findsOneWidget);
+    expect(find.text('Last Workout'), findsNothing);
 
     final Finder startWorkoutButton = find.text('Start Workout');
     await tester.ensureVisible(startWorkoutButton);
@@ -264,8 +265,24 @@ void main() {
         ),
       ],
     );
+    final Workout nextWorkout = Workout(
+      id: 'completion-pull-a',
+      name: 'Pull A',
+      scheduledDate: DateTime.utc(2026, 7, 31),
+      status: WorkoutStatus.planned,
+      exerciseIds: <String>[row.id],
+      sets: <WorkoutSet>[
+        WorkoutSet(
+          id: 'completion-pull-row-1',
+          exerciseId: row.id,
+          setNumber: 1,
+          targetReps: 8,
+          status: WorkoutSetStatus.planned,
+        ),
+      ],
+    );
     final _FakeWorkoutRepository workoutRepository = _FakeWorkoutRepository(
-      <Workout>[workout],
+      <Workout>[workout, nextWorkout],
     );
 
     await tester.pumpWidget(
@@ -344,8 +361,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Today'), findsOneWidget);
-    expect(find.text('Completed'), findsOneWidget);
-    expect(find.text('Workout completed'), findsOneWidget);
+    expect(find.text('Next Workout'), findsOneWidget);
+    expect(find.text('Pull A'), findsOneWidget);
+    expect(find.text('Last Workout'), findsOneWidget);
+    expect(find.text('Push A'), findsOneWidget);
+    expect(find.text('Completed today'), findsOneWidget);
+    expect(find.text('Start Workout'), findsOneWidget);
   });
 
   testWidgets('History shows an empty state without completed workouts', (
@@ -457,7 +478,7 @@ void main() {
     );
     final Workout activeWorkout = Workout(
       id: 'active-workout',
-      name: 'Today Push',
+      name: 'Push A',
       scheduledDate: DateTime.utc(2026, 7, 30),
       status: WorkoutStatus.planned,
       exerciseIds: <String>[benchPress.id],

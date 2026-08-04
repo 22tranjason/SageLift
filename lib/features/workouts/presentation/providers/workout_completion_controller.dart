@@ -5,6 +5,7 @@ import '../../domain/models/workout.dart';
 import '../../domain/models/workout_set.dart';
 import '../../domain/repositories/exercise_repository.dart';
 import '../../domain/repositories/workout_repository.dart';
+import '../../domain/services/workout_program.dart';
 import 'today_workout_provider.dart';
 import 'workout_set_progress_controller.dart';
 
@@ -14,7 +15,10 @@ final Provider<WorkoutCompletionController>
     Provider<WorkoutCompletionController>((Ref ref) {
   return WorkoutCompletionController(
     workoutRepository: ref.watch(workoutRepositoryProvider),
-    onWorkoutChanged: () => ref.invalidate(todayWorkoutProvider),
+    onWorkoutChanged: () {
+      ref.invalidate(todayWorkoutProvider);
+      ref.invalidate(lastCompletedWorkoutProvider);
+    },
     clearSetProgress:
         ref.read(workoutSetProgressControllerProvider.notifier).clear,
     readSetProgress: () => ref.read(workoutSetProgressControllerProvider),
@@ -110,8 +114,57 @@ class WorkoutCompletionController {
       sets: completedSets,
     );
     await _workoutRepository.save(completedWorkout);
+    await _createNextWorkoutIfNeeded(completedWorkout, finishedAt);
     _onWorkoutChanged();
     return completedWorkout;
+  }
+
+  Future<void> _createNextWorkoutIfNeeded(
+    Workout completedWorkout,
+    DateTime finishedAt,
+  ) async {
+    final List<Workout> workouts = await _workoutRepository.getAll();
+    if (WorkoutProgram.nextIncompleteWorkout(workouts) != null) return;
+
+    final String? nextWorkoutName = WorkoutProgram.nextWorkoutName(
+      completedWorkout.name,
+    );
+    if (nextWorkoutName == null) return;
+
+    Workout? template;
+    for (final Workout workout in workouts) {
+      if (workout.name == nextWorkoutName) {
+        template = workout;
+        break;
+      }
+    }
+    if (template == null) return;
+
+    final String sessionId =
+        '${template.id}-${finishedAt.microsecondsSinceEpoch}-${workouts.length}';
+    final List<WorkoutSet> plannedSets = <WorkoutSet>[
+      for (int index = 0; index < template.sets.length; index++)
+        template.sets[index].copyWith(
+          id: '$sessionId-set-${index + 1}',
+          weightKg: null,
+          reps: null,
+          rpe: null,
+          status: WorkoutSetStatus.planned,
+        ),
+    ];
+    final Workout nextWorkout = template.copyWith(
+      id: sessionId,
+      scheduledDate: DateTime(
+        finishedAt.year,
+        finishedAt.month,
+        finishedAt.day,
+      ),
+      sets: plannedSets,
+      status: WorkoutStatus.planned,
+      startedAt: null,
+      completedAt: null,
+    );
+    await _workoutRepository.save(nextWorkout);
   }
 
   WorkoutSet _completedSet(WorkoutSet set, WorkoutSetProgress progress) {
