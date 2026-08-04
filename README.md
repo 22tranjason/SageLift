@@ -76,3 +76,9 @@ git commit -m "chore: initialize SageLift foundation"
 4. Choose a cloud-sync conflict strategy before accounts exist; an append-only event log fits training history well.
 5. Define privacy, export/delete, backup, and accessibility expectations before collecting personal data.
 6. Add CI to run formatting, analysis, tests, and a web build when a remote repository is created.
+
+## GitHub Pages
+
+The deployed web app is available at `https://22tranjason.github.io/SageLift/` after the GitHub Pages workflow has successfully run from `main`. It uses browser-local storage, so it works without a backend or cloud database.
+
+Safari website-data clearing can erase SageLift data. Each browser and device keeps a separate local copy of that data.
