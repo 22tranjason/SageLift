@@ -7,6 +7,9 @@ class HiveLocalKeyValueStore implements KeyValueStore {
   static const String _boxName = 'sagelift_settings';
   late final Box<dynamic> _box;
 
+  /// The settings box, exposed to the local backup data service at bootstrap.
+  Box<dynamic> get box => _box;
+
   @override
   Future<void> initialize() async {
     await Hive.initFlutter();

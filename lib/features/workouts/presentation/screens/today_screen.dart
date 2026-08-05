@@ -36,6 +36,13 @@ class TodayScreen extends ConsumerWidget {
             },
             child: const Text('History'),
           ),
+          IconButton(
+            tooltip: 'Settings',
+            onPressed: () {
+              unawaited(context.pushNamed(AppRoute.settings.name));
+            },
+            icon: const Icon(Icons.settings_outlined),
+          ),
         ],
       ),
       body: SafeArea(
@@ -216,8 +223,11 @@ class _DailyTargetsCard extends ConsumerWidget {
             trailing: Text(
               '${_numberLabel(targets.waterMillilitres / 1000)} / 3 L',
             ),
-            onTap: () =>
+            onTap: () {
+              unawaited(
                 ref.read(dailyTargetsControllerProvider.notifier).addWater(250),
+              );
+            },
             onLongPress: () => _addCustomWater(context, ref),
           ),
           ListTile(
@@ -240,7 +250,9 @@ class _DailyTargetsCard extends ConsumerWidget {
       label: 'Grams',
     );
     if (grams == null) return;
-    ref.read(dailyTargetsControllerProvider.notifier).addProtein(grams);
+    unawaited(
+      ref.read(dailyTargetsControllerProvider.notifier).addProtein(grams),
+    );
   }
 
   Future<void> _addCustomWater(BuildContext context, WidgetRef ref) async {
@@ -250,7 +262,9 @@ class _DailyTargetsCard extends ConsumerWidget {
       label: 'Millilitres',
     );
     if (millilitres == null) return;
-    ref.read(dailyTargetsControllerProvider.notifier).addWater(millilitres);
+    unawaited(
+      ref.read(dailyTargetsControllerProvider.notifier).addWater(millilitres),
+    );
   }
 
   Future<void> _setSteps(BuildContext context, WidgetRef ref) async {
@@ -261,9 +275,11 @@ class _DailyTargetsCard extends ConsumerWidget {
       allowDecimal: false,
     );
     if (enteredSteps == null) return;
-    ref
-        .read(dailyTargetsControllerProvider.notifier)
-        .setSteps(enteredSteps.round());
+    unawaited(
+      ref
+          .read(dailyTargetsControllerProvider.notifier)
+          .setSteps(enteredSteps.round()),
+    );
   }
 }
 
@@ -293,13 +309,21 @@ class _HabitsTile extends ConsumerWidget {
               title: Text(habit.name),
               trailing: Checkbox(
                 value: habit.isCompleted,
-                onChanged: (bool? value) => ref
-                    .read(dailyTargetsControllerProvider.notifier)
-                    .toggleHabit(habit.id),
+                onChanged: (bool? value) {
+                  unawaited(
+                    ref
+                        .read(dailyTargetsControllerProvider.notifier)
+                        .toggleHabit(habit.id),
+                  );
+                },
               ),
-              onTap: () => ref
-                  .read(dailyTargetsControllerProvider.notifier)
-                  .toggleHabit(habit.id),
+              onTap: () {
+                unawaited(
+                  ref
+                      .read(dailyTargetsControllerProvider.notifier)
+                      .toggleHabit(habit.id),
+                );
+              },
             ),
         ],
       ),

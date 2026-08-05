@@ -3,6 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sagelift/app/sagelift_app.dart';
 import 'package:sagelift/core/storage/key_value_store.dart';
+import 'package:sagelift/features/check_ins/domain/models/daily_check_in.dart';
+import 'package:sagelift/features/check_ins/domain/repositories/daily_check_in_repository.dart';
+import 'package:sagelift/features/check_ins/presentation/providers/daily_targets_controller.dart';
+import 'package:sagelift/features/habits/domain/models/habit.dart';
+import 'package:sagelift/features/habits/domain/repositories/habit_repository.dart';
 import 'package:sagelift/features/workouts/domain/models/exercise.dart';
 import 'package:sagelift/features/workouts/domain/models/workout.dart';
 import 'package:sagelift/features/workouts/domain/models/workout_set.dart';
@@ -48,6 +53,10 @@ void main() {
       ProviderScope(
         overrides: <Override>[
           keyValueStoreProvider.overrideWithValue(_InMemoryKeyValueStore()),
+          dailyCheckInRepositoryProvider.overrideWithValue(
+            _FakeDailyCheckInRepository(),
+          ),
+          habitRepositoryProvider.overrideWithValue(_FakeHabitRepository()),
           exerciseRepositoryProvider.overrideWithValue(
             _FakeExerciseRepository(<Exercise>[benchPress, inclinePress]),
           ),
@@ -164,6 +173,10 @@ void main() {
       ProviderScope(
         overrides: <Override>[
           keyValueStoreProvider.overrideWithValue(_InMemoryKeyValueStore()),
+          dailyCheckInRepositoryProvider.overrideWithValue(
+            _FakeDailyCheckInRepository(),
+          ),
+          habitRepositoryProvider.overrideWithValue(_FakeHabitRepository()),
           exerciseRepositoryProvider.overrideWithValue(
             _FakeExerciseRepository(<Exercise>[benchPress, inclinePress]),
           ),
@@ -323,6 +336,10 @@ void main() {
       ProviderScope(
         overrides: <Override>[
           keyValueStoreProvider.overrideWithValue(_InMemoryKeyValueStore()),
+          dailyCheckInRepositoryProvider.overrideWithValue(
+            _FakeDailyCheckInRepository(),
+          ),
+          habitRepositoryProvider.overrideWithValue(_FakeHabitRepository()),
           exerciseRepositoryProvider.overrideWithValue(
             _FakeExerciseRepository(<Exercise>[benchPress, row]),
           ),
@@ -422,6 +439,10 @@ void main() {
       ProviderScope(
         overrides: <Override>[
           keyValueStoreProvider.overrideWithValue(_InMemoryKeyValueStore()),
+          dailyCheckInRepositoryProvider.overrideWithValue(
+            _FakeDailyCheckInRepository(),
+          ),
+          habitRepositoryProvider.overrideWithValue(_FakeHabitRepository()),
           exerciseRepositoryProvider.overrideWithValue(
             _FakeExerciseRepository(const <Exercise>[]),
           ),
@@ -472,6 +493,10 @@ void main() {
       ProviderScope(
         overrides: <Override>[
           keyValueStoreProvider.overrideWithValue(_InMemoryKeyValueStore()),
+          dailyCheckInRepositoryProvider.overrideWithValue(
+            _FakeDailyCheckInRepository(),
+          ),
+          habitRepositoryProvider.overrideWithValue(_FakeHabitRepository()),
           exerciseRepositoryProvider.overrideWithValue(
             _FakeExerciseRepository(<Exercise>[benchPress]),
           ),
@@ -553,6 +578,10 @@ void main() {
       ProviderScope(
         overrides: <Override>[
           keyValueStoreProvider.overrideWithValue(_InMemoryKeyValueStore()),
+          dailyCheckInRepositoryProvider.overrideWithValue(
+            _FakeDailyCheckInRepository(),
+          ),
+          habitRepositoryProvider.overrideWithValue(_FakeHabitRepository()),
           exerciseRepositoryProvider.overrideWithValue(
             _FakeExerciseRepository(<Exercise>[benchPress]),
           ),
@@ -727,6 +756,52 @@ class _FakeExerciseRepository implements ExerciseRepository {
         )
         .toList();
   }
+}
+
+class _FakeDailyCheckInRepository implements DailyCheckInRepository {
+  final Map<String, DailyCheckIn> _records = <String, DailyCheckIn>{};
+
+  @override
+  Future<void> delete(String id) async {
+    _records.remove(id);
+  }
+
+  @override
+  Future<List<DailyCheckIn>> getAll() async => _records.values.toList();
+
+  @override
+  Future<DailyCheckIn?> getByDate(DateTime date) async {
+    for (final DailyCheckIn checkIn in _records.values) {
+      if (checkIn.date.year == date.year &&
+          checkIn.date.month == date.month &&
+          checkIn.date.day == date.day) {
+        return checkIn;
+      }
+    }
+    return null;
+  }
+
+  @override
+  Future<void> save(DailyCheckIn checkIn) async {
+    _records[checkIn.id] = checkIn;
+  }
+}
+
+class _FakeHabitRepository implements HabitRepository {
+  @override
+  Future<void> delete(String id) async {}
+
+  @override
+  Future<List<Habit>> getActive() async => const <Habit>[];
+
+  @override
+  Future<List<Habit>> getAll() async => const <Habit>[];
+
+  @override
+  Future<Habit?> getById(String id) async => null;
+
+  @override
+  Future<void> save(Habit habit) async {}
 }
 
 class _FakeWorkoutRepository implements WorkoutRepository {

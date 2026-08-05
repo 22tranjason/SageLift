@@ -19,17 +19,19 @@ enum Mood {
 /// A daily snapshot of health and nutrition inputs.
 class DailyCheckIn {
   /// Creates an immutable daily check-in.
-  const DailyCheckIn({
+  DailyCheckIn({
     required this.id,
     required this.date,
     required this.bodyWeightKg,
     required this.proteinGrams,
     required this.waterMillilitres,
+    this.steps = 0,
+    List<String> completedHabitIds = const <String>[],
     this.heightCm,
     this.mood,
     this.energyLevel,
     this.notes,
-  });
+  }) : _completedHabitIds = List<String>.unmodifiable(completedHabitIds);
 
   /// Stable, client-generated identifier for this check-in.
   final String id;
@@ -48,6 +50,14 @@ class DailyCheckIn {
 
   /// Total water consumed during the calendar day, in millilitres.
   final double waterMillilitres;
+
+  /// Manually entered step count until a health integration is available.
+  final int steps;
+
+  final List<String> _completedHabitIds;
+
+  /// Identifiers of habits completed on this calendar day.
+  List<String> get completedHabitIds => _completedHabitIds;
 
   /// Optional general emotional state.
   final Mood? mood;
@@ -70,6 +80,8 @@ class DailyCheckIn {
     Object? heightCm = _unset,
     double? proteinGrams,
     double? waterMillilitres,
+    int? steps,
+    List<String>? completedHabitIds,
     Object? mood = _unset,
     Object? energyLevel = _unset,
     Object? notes = _unset,
@@ -82,6 +94,8 @@ class DailyCheckIn {
           identical(heightCm, _unset) ? this.heightCm : heightCm as double?,
       proteinGrams: proteinGrams ?? this.proteinGrams,
       waterMillilitres: waterMillilitres ?? this.waterMillilitres,
+      steps: steps ?? this.steps,
+      completedHabitIds: completedHabitIds ?? _completedHabitIds,
       mood: identical(mood, _unset) ? this.mood : mood as Mood?,
       energyLevel: identical(energyLevel, _unset)
           ? this.energyLevel
@@ -99,6 +113,8 @@ class DailyCheckIn {
         other.heightCm == heightCm &&
         other.proteinGrams == proteinGrams &&
         other.waterMillilitres == waterMillilitres &&
+        other.steps == steps &&
+        _listEquals(other._completedHabitIds, _completedHabitIds) &&
         other.mood == mood &&
         other.energyLevel == energyLevel &&
         other.notes == notes;
@@ -112,8 +128,19 @@ class DailyCheckIn {
         heightCm,
         proteinGrams,
         waterMillilitres,
+        steps,
+        Object.hashAll(_completedHabitIds),
         mood,
         energyLevel,
         notes,
       );
+}
+
+bool _listEquals<T>(List<T> first, List<T> second) {
+  if (identical(first, second)) return true;
+  if (first.length != second.length) return false;
+  for (int index = 0; index < first.length; index++) {
+    if (first[index] != second[index]) return false;
+  }
+  return true;
 }

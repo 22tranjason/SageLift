@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/workouts/presentation/screens/exercise_screen.dart';
 import '../../features/workouts/presentation/screens/today_screen.dart';
 import '../../features/workouts/presentation/screens/workout_details_screen.dart';
@@ -28,6 +29,9 @@ enum AppRoute {
 
   /// A completed workout's persisted detail route identified by its ID.
   workoutDetails,
+
+  /// Local backup, restore, and application information.
+  settings,
 }
 
 /// Owns navigation configuration so features never instantiate routers directly.
@@ -40,6 +44,13 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((Ref ref) {
         name: AppRoute.today.name,
         builder: (BuildContext context, GoRouterState state) {
           return const TodayScreen();
+        },
+      ),
+      GoRoute(
+        path: '/settings',
+        name: AppRoute.settings.name,
+        builder: (BuildContext context, GoRouterState state) {
+          return const SettingsScreen();
         },
       ),
       GoRoute(
