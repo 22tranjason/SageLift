@@ -43,7 +43,7 @@ void main() {
     final List<Exercise> exercises = await exerciseRepository.getAll();
     final List<Workout> workouts = await workoutRepository.getAll();
 
-    expect(exercises, hasLength(28));
+    expect(exercises, hasLength(29));
     expect(workouts, hasLength(6));
     expect(
       exercises.map((Exercise exercise) => exercise.name),
@@ -69,7 +69,16 @@ void main() {
               .toList(growable: false),
         ),
       );
-      expect(workout.sets, hasLength(15));
+      expect(
+        workout.sets,
+        hasLength(
+          expectedWorkout.prescriptions.fold<int>(
+            0,
+            (int total, _ExpectedPrescription prescription) =>
+                total + prescription.setCount,
+          ),
+        ),
+      );
 
       for (final _ExpectedPrescription prescription
           in expectedWorkout.prescriptions) {
@@ -78,10 +87,15 @@ void main() {
               (WorkoutSet set) => set.exerciseId == prescription.exerciseId,
             )
             .toList(growable: false);
-        expect(sets, hasLength(3));
+        expect(sets, hasLength(prescription.setCount));
         expect(
           sets.map((WorkoutSet set) => set.setNumber),
-          equals(<int>[1, 2, 3]),
+          equals(
+            List<int>.generate(
+              prescription.setCount,
+              (int index) => index + 1,
+            ),
+          ),
         );
         expect(
           sets.map((WorkoutSet set) => set.targetReps),
@@ -188,6 +202,9 @@ const List<_ExpectedWorkout> _expectedWorkouts = <_ExpectedWorkout>[
           'Target 12–15 reps; rest 60–90 sec'),
       _ExpectedPrescription('seed-exercise-cable-triceps-pushdown', 15,
           'Target 10–15 reps; rest 60–90 sec'),
+      _ExpectedPrescription('seed-exercise-overhead-rope-triceps-extension', 15,
+          'Target 10-15 reps; rest 60-90 sec',
+          setCount: 1),
     ],
   ),
   _ExpectedWorkout(
@@ -285,9 +302,15 @@ class _ExpectedWorkout {
 }
 
 class _ExpectedPrescription {
-  const _ExpectedPrescription(this.exerciseId, this.targetReps, this.notes);
+  const _ExpectedPrescription(
+    this.exerciseId,
+    this.targetReps,
+    this.notes, {
+    this.setCount = 3,
+  });
 
   final String exerciseId;
   final int targetReps;
   final String notes;
+  final int setCount;
 }

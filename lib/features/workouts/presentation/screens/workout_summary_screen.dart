@@ -48,8 +48,13 @@ class WorkoutSummaryScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 16),
                   _SummaryRow(
-                      label: 'Date',
-                      value: _dateLabel(value.workout.scheduledDate)),
+                    label: 'Date',
+                    value: _dateLabel(
+                      value.workout.startedAt ??
+                          value.workout.completedAt ??
+                          value.workout.scheduledDate,
+                    ),
+                  ),
                   _SummaryRow(
                       label: 'Start time',
                       value: _timeLabel(value.workout.startedAt)),
@@ -132,14 +137,42 @@ class WorkoutSummaryScreen extends ConsumerWidget {
   }
 
   String _dateLabel(DateTime date) {
-    return '${date.day}/${date.month}/${date.year}';
+    const List<String> weekdays = <String>[
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
+    const List<String> months = <String>[
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    final DateTime localDate = date.toLocal();
+    return '${weekdays[localDate.weekday - 1]}, '
+        '${localDate.day} ${months[localDate.month - 1]} ${localDate.year}';
   }
 
   String _timeLabel(DateTime? time) {
     if (time == null) return 'Not recorded';
-    final String hour = time.hour.toString().padLeft(2, '0');
-    final String minute = time.minute.toString().padLeft(2, '0');
-    return '$hour:$minute';
+    final DateTime localTime = time.toLocal();
+    final String hour =
+        (localTime.hour % 12 == 0 ? 12 : localTime.hour % 12).toString();
+    final String minute = localTime.minute.toString().padLeft(2, '0');
+    final String suffix = localTime.hour < 12 ? 'AM' : 'PM';
+    return '$hour:$minute $suffix';
   }
 
   String _durationLabel(Duration duration) {

@@ -67,6 +67,40 @@ void main() {
     expect(find.text('Start Workout'), findsOneWidget);
     expect(find.text('Last Workout'), findsNothing);
 
+    await tester.tap(find.byKey(const ValueKey<String>('water-target')));
+    await tester.pumpAndSettle();
+    expect(find.text('0.25 / 3 L'), findsOneWidget);
+
+    await tester.longPress(find.byKey(const ValueKey<String>('water-target')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey<String>('daily-target-number-input')),
+      '500',
+    );
+    await tester.tap(find.text('Add'));
+    await tester.pumpAndSettle();
+    expect(find.text('0.75 / 3 L'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey<String>('protein-target')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey<String>('daily-target-number-input')),
+      '30',
+    );
+    await tester.tap(find.text('Add'));
+    await tester.pumpAndSettle();
+    expect(find.text('30 / 160 g'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey<String>('steps-target')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey<String>('daily-target-number-input')),
+      '2500',
+    );
+    await tester.tap(find.text('Add'));
+    await tester.pumpAndSettle();
+    expect(find.text('2500 / 10,000'), findsOneWidget);
+
     final Finder startWorkoutButton = find.text('Start Workout');
     await tester.ensureVisible(startWorkoutButton);
     await tester.pumpAndSettle();
@@ -355,6 +389,18 @@ void main() {
     expect(completedWorkout?.completedAt, isNotNull);
     expect(completedWorkout?.sets[0].weightKg, 80);
     expect(completedWorkout?.sets[0].reps, 10);
+    expect(
+      find.text(_summaryDateLabel(completedWorkout!.startedAt!)),
+      findsOneWidget,
+    );
+    expect(
+      find.text(_summaryTimeLabel(completedWorkout.startedAt!)),
+      findsAtLeastNWidgets(1),
+    );
+    expect(
+      find.text(_summaryTimeLabel(completedWorkout.completedAt!)),
+      findsAtLeastNWidgets(1),
+    );
 
     await tester.ensureVisible(find.text('Done'));
     await tester.tap(find.text('Done'));
@@ -583,6 +629,43 @@ Workout _completedWorkout({
     startedAt: startedAt,
     completedAt: completedAt,
   );
+}
+
+String _summaryDateLabel(DateTime date) {
+  const List<String> weekdays = <String>[
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
+  ];
+  const List<String> months = <String>[
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
+  final DateTime localDate = date.toLocal();
+  return '${weekdays[localDate.weekday - 1]}, '
+      '${localDate.day} ${months[localDate.month - 1]} ${localDate.year}';
+}
+
+String _summaryTimeLabel(DateTime date) {
+  final DateTime localTime = date.toLocal();
+  final int hour = localTime.hour % 12 == 0 ? 12 : localTime.hour % 12;
+  final String minute = localTime.minute.toString().padLeft(2, '0');
+  final String suffix = localTime.hour < 12 ? 'AM' : 'PM';
+  return '$hour:$minute $suffix';
 }
 
 class _InMemoryKeyValueStore implements KeyValueStore {

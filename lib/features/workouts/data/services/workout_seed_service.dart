@@ -16,19 +16,70 @@ class WorkoutSeedService {
   final ExerciseRepository _exerciseRepository;
   final WorkoutRepository _workoutRepository;
 
-  /// Inserts the programme only when the workout database is completely empty.
+  /// Inserts the programme when the workout database is completely empty.
   ///
-  /// Existing data is never changed, so repeated startup calls are safe.
+  /// Repeated calls also safely add the current Push A extension to planned
+  /// sessions, without changing completed or in-progress workout history.
   Future<void> seedIfEmpty() async {
     final List<Exercise> existingExercises = await _exerciseRepository.getAll();
     final List<Workout> existingWorkouts = await _workoutRepository.getAll();
-    if (existingExercises.isNotEmpty || existingWorkouts.isNotEmpty) return;
+    if (existingExercises.isNotEmpty || existingWorkouts.isNotEmpty) {
+      await _upgradePlannedPushA(
+        existingExercises: existingExercises,
+        existingWorkouts: existingWorkouts,
+      );
+      return;
+    }
 
     for (final Exercise exercise in _exercises) {
       await _exerciseRepository.save(exercise);
     }
     for (final Workout workout in _workouts) {
       await _workoutRepository.save(workout);
+    }
+  }
+
+  Future<void> _upgradePlannedPushA({
+    required List<Exercise> existingExercises,
+    required List<Workout> existingWorkouts,
+  }) async {
+    final Exercise overheadRopeExtension = _exercises.singleWhere(
+      (Exercise exercise) => exercise.id == _pushAExtension.exerciseId,
+    );
+    if (!existingExercises.any(
+      (Exercise exercise) => exercise.id == _pushAExtension.exerciseId,
+    )) {
+      await _exerciseRepository.save(overheadRopeExtension);
+    }
+
+    for (final Workout workout in existingWorkouts) {
+      if (workout.name != 'Push A' ||
+          workout.status != WorkoutStatus.planned ||
+          workout.exerciseIds.contains(_pushAExtension.exerciseId)) {
+        continue;
+      }
+      final List<WorkoutSet> extensionSets = <WorkoutSet>[
+        for (int setNumber = 1;
+            setNumber <= _pushAExtension.setCount;
+            setNumber++)
+          WorkoutSet(
+            id: 'seed-set-${workout.id}-${_pushAExtension.exerciseId}-$setNumber',
+            exerciseId: _pushAExtension.exerciseId,
+            setNumber: setNumber,
+            targetReps: _pushAExtension.targetReps,
+            status: WorkoutSetStatus.planned,
+            notes: _pushAExtension.notes,
+          ),
+      ];
+      await _workoutRepository.save(
+        workout.copyWith(
+          exerciseIds: <String>[
+            ...workout.exerciseIds,
+            _pushAExtension.exerciseId,
+          ],
+          sets: <WorkoutSet>[...workout.sets, ...extensionSets],
+        ),
+      );
     }
   }
 
@@ -64,6 +115,13 @@ class WorkoutSeedService {
     Exercise(
       id: 'seed-exercise-cable-triceps-pushdown',
       name: 'Cable Triceps Pushdown',
+      category: ExerciseCategory.strength,
+      primaryMuscleGroup: MuscleGroup.arms,
+      equipment: Equipment.cableMachine,
+    ),
+    Exercise(
+      id: 'seed-exercise-overhead-rope-triceps-extension',
+      name: 'Overhead Rope Triceps Extension',
       category: ExerciseCategory.strength,
       primaryMuscleGroup: MuscleGroup.arms,
       equipment: Equipment.cableMachine,
@@ -261,6 +319,7 @@ class WorkoutSeedService {
           targetReps: 15,
           notes: 'Target 10–15 reps; rest 60–90 sec',
         ),
+        _pushAExtension,
       ],
     ),
     _workout(
@@ -420,6 +479,13 @@ class WorkoutSeedService {
     ),
   ];
 
+  static const _ExercisePrescription _pushAExtension = _ExercisePrescription(
+    exerciseId: 'seed-exercise-overhead-rope-triceps-extension',
+    targetReps: 15,
+    setCount: 1,
+    notes: 'Target 10-15 reps; rest 60-90 sec',
+  );
+
   static Workout _workout({
     required String id,
     required String name,
@@ -435,7 +501,9 @@ class WorkoutSeedService {
           .toList(growable: false),
       sets: <WorkoutSet>[
         for (final _ExercisePrescription prescription in prescriptions)
-          for (int setNumber = 1; setNumber <= 3; setNumber++)
+          for (int setNumber = 1;
+              setNumber <= prescription.setCount;
+              setNumber++)
             WorkoutSet(
               id: 'seed-set-$id-${prescription.exerciseId}-$setNumber',
               exerciseId: prescription.exerciseId,
@@ -454,9 +522,11 @@ class _ExercisePrescription {
     required this.exerciseId,
     required this.targetReps,
     required this.notes,
+    this.setCount = 3,
   });
 
   final String exerciseId;
   final int targetReps;
   final String notes;
+  final int setCount;
 }

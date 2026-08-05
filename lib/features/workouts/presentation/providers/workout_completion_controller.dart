@@ -168,7 +168,9 @@ class WorkoutCompletionController {
   }
 
   WorkoutSet _completedSet(WorkoutSet set, WorkoutSetProgress progress) {
-    if (!progress.hasRecordedValues) return set;
+    if (!progress.hasRecordedValues) {
+      return set.copyWith(status: WorkoutSetStatus.skipped);
+    }
     return set.copyWith(
       weightKg: double.tryParse(progress.weight),
       reps: int.tryParse(progress.reps),
