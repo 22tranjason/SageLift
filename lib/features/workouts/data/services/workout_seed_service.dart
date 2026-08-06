@@ -3,6 +3,7 @@ import '../../domain/models/workout.dart';
 import '../../domain/models/workout_set.dart';
 import '../../domain/repositories/exercise_repository.dart';
 import '../../domain/repositories/workout_repository.dart';
+import '../../domain/services/workout_program.dart';
 
 /// Adds Jason's initial push, pull, legs programme to an empty local database.
 class WorkoutSeedService {
@@ -18,8 +19,9 @@ class WorkoutSeedService {
 
   /// Inserts the programme when the workout database is completely empty.
   ///
-  /// Repeated calls also safely add the current Push A extension to planned
-  /// sessions, without changing completed or in-progress workout history.
+  /// Repeated calls never reseed or delete history. They safely upgrade planned
+  /// Push A sessions and reconcile one missing recommended planned session for
+  /// users whose older app version left only completed program records.
   Future<void> seedIfEmpty() async {
     final List<Exercise> existingExercises = await _exerciseRepository.getAll();
     final List<Workout> existingWorkouts = await _workoutRepository.getAll();
@@ -28,6 +30,7 @@ class WorkoutSeedService {
         existingExercises: existingExercises,
         existingWorkouts: existingWorkouts,
       );
+      await _reconcileRecommendedPlannedWorkout();
       return;
     }
 
@@ -37,6 +40,44 @@ class WorkoutSeedService {
     for (final Workout workout in _workouts) {
       await _workoutRepository.save(workout);
     }
+  }
+
+  /// Compatibility reconciliation for existing local databases.
+  ///
+  /// It preserves completed history and existing planned sessions. A new session
+  /// is created only when the recommended program name has no planned record.
+  Future<void> _reconcileRecommendedPlannedWorkout() async {
+    final List<Workout> workouts = await _workoutRepository.getAll();
+    if (workouts.any(
+      (Workout workout) => workout.status == WorkoutStatus.inProgress,
+    )) {
+      return;
+    }
+    final String recommendedName =
+        WorkoutProgram.recommendedNextWorkoutName(workouts);
+    if (workouts.any(
+      (Workout workout) =>
+          workout.status == WorkoutStatus.planned &&
+          workout.name == recommendedName,
+    )) {
+      return;
+    }
+    final List<Workout> templates = workouts
+        .where((Workout workout) => workout.name == recommendedName)
+        .toList(growable: false)
+      ..sort((Workout first, Workout second) => first.id.compareTo(second.id));
+    if (templates.isEmpty) return;
+    final DateTime now = DateTime.now();
+    final String sessionId = 'program-migration-'
+        '${recommendedName.toLowerCase().replaceAll(' ', '-')}-'
+        '${now.microsecondsSinceEpoch}-${workouts.length}';
+    await _workoutRepository.save(
+      WorkoutProgram.createPlannedSession(
+        template: templates.first,
+        id: sessionId,
+        scheduledDate: DateTime(now.year, now.month, now.day),
+      ),
+    );
   }
 
   Future<void> _upgradePlannedPushA({

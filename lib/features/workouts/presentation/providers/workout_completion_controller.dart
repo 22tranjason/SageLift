@@ -16,8 +16,7 @@ final Provider<WorkoutCompletionController>
   return WorkoutCompletionController(
     workoutRepository: ref.watch(workoutRepositoryProvider),
     onWorkoutChanged: () {
-      ref.invalidate(todayWorkoutProvider);
-      ref.invalidate(lastCompletedWorkoutProvider);
+      ref.read(workoutDataRevisionProvider.notifier).state++;
     },
     clearSetProgress:
         ref.read(workoutSetProgressControllerProvider.notifier).clear,
@@ -51,20 +50,24 @@ final FutureProviderFamily<WorkoutSummary?, String> workoutSummaryProvider =
 /// Writes workout lifecycle changes through the existing offline repository.
 class WorkoutCompletionController {
   /// Creates a controller using the workout repository and local set-entry state.
-  const WorkoutCompletionController({
+  WorkoutCompletionController({
     required WorkoutRepository workoutRepository,
     required void Function() onWorkoutChanged,
     required void Function() clearSetProgress,
     required Map<String, WorkoutSetProgress> Function() readSetProgress,
+    DateTime Function()? now,
   })  : _workoutRepository = workoutRepository,
         _onWorkoutChanged = onWorkoutChanged,
         _clearSetProgress = clearSetProgress,
-        _readSetProgress = readSetProgress;
+        _readSetProgress = readSetProgress,
+        _now = now ?? DateTime.now;
 
   final WorkoutRepository _workoutRepository;
   final void Function() _onWorkoutChanged;
   final void Function() _clearSetProgress;
   final Map<String, WorkoutSetProgress> Function() _readSetProgress;
+  final DateTime Function() _now;
+  final Set<String> _finishingWorkoutIds = <String>{};
 
   /// Starts [workout] once and persists its start time.
   ///
@@ -80,91 +83,172 @@ class WorkoutCompletionController {
     _clearSetProgress();
     final Workout startedWorkout = currentWorkout.copyWith(
       status: WorkoutStatus.inProgress,
-      startedAt: DateTime.now(),
+      startedAt: _now(),
       completedAt: null,
     );
     await _workoutRepository.save(startedWorkout);
+    final Workout? savedWorkout = await _workoutRepository.getById(workout.id);
+    if (savedWorkout?.status != WorkoutStatus.inProgress) {
+      throw StateError('Unable to save the started workout.');
+    }
     _onWorkoutChanged();
-    return startedWorkout;
+    return savedWorkout;
   }
 
   /// Records entered sets, marks the workout complete, and persists it.
   ///
   /// Returns null when the workout is missing or was already completed.
   Future<Workout?> finishWorkout(String workoutId) async {
-    final Workout? workout = await _workoutRepository.getById(workoutId);
-    if (workout == null || workout.status == WorkoutStatus.completed) {
-      return null;
-    }
+    if (!_finishingWorkoutIds.add(workoutId)) return null;
+    try {
+      final Workout? workout = await _workoutRepository.getById(workoutId);
+      if (workout == null || workout.status == WorkoutStatus.completed) {
+        return null;
+      }
 
-    final Map<String, WorkoutSetProgress> progressBySetId = _readSetProgress();
-    final List<WorkoutSet> completedSets = workout.sets
-        .map(
-          (WorkoutSet set) => _completedSet(
-            set,
-            progressBySetId[set.id] ?? const WorkoutSetProgress(),
-          ),
-        )
-        .toList(growable: false);
-    final DateTime finishedAt = DateTime.now();
-    final Workout completedWorkout = workout.copyWith(
-      status: WorkoutStatus.completed,
-      startedAt: workout.startedAt ?? finishedAt,
-      completedAt: finishedAt,
-      sets: completedSets,
-    );
-    await _workoutRepository.save(completedWorkout);
-    await _createNextWorkoutIfNeeded(completedWorkout, finishedAt);
-    _onWorkoutChanged();
-    return completedWorkout;
+      final Map<String, WorkoutSetProgress> progressBySetId =
+          _readSetProgress();
+      final List<WorkoutSet> completedSets = workout.sets
+          .map(
+            (WorkoutSet set) => _completedSet(
+              set,
+              progressBySetId[set.id] ?? const WorkoutSetProgress(),
+            ),
+          )
+          .toList(growable: false);
+      final DateTime finishedAt = _now();
+      final Workout completedWorkout = workout.copyWith(
+        status: WorkoutStatus.completed,
+        startedAt: workout.startedAt ?? finishedAt,
+        completedAt: finishedAt,
+        sets: completedSets,
+      );
+      await _workoutRepository.save(completedWorkout);
+      final Workout? savedWorkout = await _workoutRepository.getById(workoutId);
+      if (savedWorkout == null ||
+          savedWorkout.status != WorkoutStatus.completed ||
+          savedWorkout.completedAt == null) {
+        throw StateError('Unable to save the completed workout.');
+      }
+      await _ensureRecommendedPlannedWorkout();
+      _onWorkoutChanged();
+      return savedWorkout;
+    } finally {
+      _finishingWorkoutIds.remove(workoutId);
+    }
   }
 
-  Future<void> _createNextWorkoutIfNeeded(
-    Workout completedWorkout,
-    DateTime finishedAt,
-  ) async {
+  /// Starts the explicitly selected program workout without changing history.
+  ///
+  /// A different active workout must be explicitly replaced by the caller.
+  Future<Workout?> startSelectedWorkout(
+    String workoutName, {
+    bool replaceInProgress = false,
+  }) async {
+    if (!WorkoutProgram.isProgramWorkoutName(workoutName)) {
+      throw ArgumentError.value(workoutName, 'workoutName');
+    }
+    final List<Workout> workouts = await _workoutRepository.getAll();
+    final Workout? activeWorkout = WorkoutProgram.nextIncompleteWorkout(
+      workouts
+          .where(
+              (Workout workout) => workout.status == WorkoutStatus.inProgress)
+          .toList(),
+    );
+    if (activeWorkout != null && activeWorkout.name != workoutName) {
+      if (!replaceInProgress) {
+        throw WorkoutAlreadyInProgressException(activeWorkout);
+      }
+      await _workoutRepository.save(
+        activeWorkout.copyWith(
+          status: WorkoutStatus.planned,
+          startedAt: null,
+        ),
+      );
+    }
+
+    final Workout? activeSameName =
+        activeWorkout?.name == workoutName ? activeWorkout : null;
+    if (activeSameName != null) return activeSameName;
+    final Workout? plannedWorkout =
+        _plannedWorkoutByName(workouts, workoutName);
+    final Workout? createdWorkout = plannedWorkout == null
+        ? _newPlannedWorkout(workouts: workouts, workoutName: workoutName)
+        : null;
+    final Workout workoutToStart = plannedWorkout ??
+        createdWorkout ??
+        (throw StateError('No $workoutName program template is available.'));
+    if (plannedWorkout == null) await _workoutRepository.save(workoutToStart);
+    return startWorkout(workoutToStart);
+  }
+
+  /// Deletes only a completed workout and refreshes dependent presentation data.
+  Future<void> deleteCompletedWorkout(String workoutId) async {
+    final Workout? workout = await _workoutRepository.getById(workoutId);
+    if (workout == null || workout.status != WorkoutStatus.completed) return;
+    await _workoutRepository.delete(workoutId);
+    await _ensureRecommendedPlannedWorkout(fallbackTemplate: workout);
+    _onWorkoutChanged();
+  }
+
+  Future<void> _ensureRecommendedPlannedWorkout({
+    Workout? fallbackTemplate,
+  }) async {
     final List<Workout> workouts = await _workoutRepository.getAll();
     if (WorkoutProgram.nextIncompleteWorkout(workouts) != null) return;
-
-    final String? nextWorkoutName = WorkoutProgram.nextWorkoutName(
-      completedWorkout.name,
+    final String workoutName =
+        WorkoutProgram.recommendedNextWorkoutName(workouts);
+    final Workout? plannedWorkout = _newPlannedWorkout(
+      workouts: workouts,
+      workoutName: workoutName,
+      fallbackTemplate: fallbackTemplate,
     );
-    if (nextWorkoutName == null) return;
+    if (plannedWorkout == null) return;
+    await _workoutRepository.save(plannedWorkout);
+  }
 
-    Workout? template;
-    for (final Workout workout in workouts) {
-      if (workout.name == nextWorkoutName) {
-        template = workout;
-        break;
-      }
-    }
-    if (template == null) return;
-
+  Workout? _newPlannedWorkout({
+    required List<Workout> workouts,
+    required String workoutName,
+    Workout? fallbackTemplate,
+  }) {
+    final Workout? template = _templateWorkoutByName(workouts, workoutName) ??
+        (fallbackTemplate?.name == workoutName ? fallbackTemplate : null);
+    if (template == null) return null;
+    final DateTime now = _now();
     final String sessionId =
-        '${template.id}-${finishedAt.microsecondsSinceEpoch}-${workouts.length}';
-    final List<WorkoutSet> plannedSets = <WorkoutSet>[
-      for (int index = 0; index < template.sets.length; index++)
-        template.sets[index].copyWith(
-          id: '$sessionId-set-${index + 1}',
-          weightKg: null,
-          reps: null,
-          rpe: null,
-          status: WorkoutSetStatus.planned,
-        ),
-    ];
-    final Workout nextWorkout = template.copyWith(
+        'program-${workoutName.toLowerCase().replaceAll(' ', '-')}-${now.microsecondsSinceEpoch}-${workouts.length}';
+    return WorkoutProgram.createPlannedSession(
+      template: template,
       id: sessionId,
-      scheduledDate: DateTime(
-        finishedAt.year,
-        finishedAt.month,
-        finishedAt.day,
-      ),
-      sets: plannedSets,
-      status: WorkoutStatus.planned,
-      startedAt: null,
-      completedAt: null,
+      scheduledDate: DateTime(now.year, now.month, now.day),
     );
-    await _workoutRepository.save(nextWorkout);
+  }
+
+  Workout? _plannedWorkoutByName(List<Workout> workouts, String workoutName) {
+    final List<Workout> candidates = workouts
+        .where(
+          (Workout workout) =>
+              workout.name == workoutName &&
+              workout.status == WorkoutStatus.planned,
+        )
+        .toList(growable: false)
+      ..sort((Workout first, Workout second) {
+        final int dateComparison =
+            second.scheduledDate.compareTo(first.scheduledDate);
+        return dateComparison != 0
+            ? dateComparison
+            : first.id.compareTo(second.id);
+      });
+    return candidates.isEmpty ? null : candidates.first;
+  }
+
+  Workout? _templateWorkoutByName(List<Workout> workouts, String workoutName) {
+    final List<Workout> candidates = workouts
+        .where((Workout workout) => workout.name == workoutName)
+        .toList(growable: false)
+      ..sort((Workout first, Workout second) => first.id.compareTo(second.id));
+    return candidates.isEmpty ? null : candidates.first;
   }
 
   WorkoutSet _completedSet(WorkoutSet set, WorkoutSetProgress progress) {
@@ -177,6 +261,15 @@ class WorkoutCompletionController {
       status: WorkoutSetStatus.completed,
     );
   }
+}
+
+/// Signals that a different workout must be explicitly replaced before starting.
+class WorkoutAlreadyInProgressException implements Exception {
+  /// Creates an error describing the active workout that would be replaced.
+  const WorkoutAlreadyInProgressException(this.workout);
+
+  /// The active workout requiring user confirmation.
+  final Workout workout;
 }
 
 /// Display-ready facts calculated from a completed workout's recorded sets.

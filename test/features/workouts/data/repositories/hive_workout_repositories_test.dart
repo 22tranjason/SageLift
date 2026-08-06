@@ -184,6 +184,16 @@ void main() {
       await workoutRepository.getById(completedWorkout.id),
       completedWorkout,
     );
+
+    await store.workoutBox.close();
+    final WorkoutHiveStore reopenedStore = await WorkoutHiveStore.open();
+    final HiveWorkoutRepository reopenedRepository = HiveWorkoutRepository(
+      reopenedStore.workoutBox,
+    );
+    expect(
+      await reopenedRepository.getById(completedWorkout.id),
+      completedWorkout,
+    );
   });
 }
 

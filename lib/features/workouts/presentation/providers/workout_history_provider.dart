@@ -11,6 +11,7 @@ import 'workout_completion_controller.dart';
 /// Loads completed workouts sorted from most recently completed to oldest.
 final FutureProvider<List<WorkoutHistoryItem>> completedWorkoutHistoryProvider =
     FutureProvider<List<WorkoutHistoryItem>>((Ref ref) async {
+  ref.watch(workoutDataRevisionProvider);
   final WorkoutRepository workoutRepository = ref.watch(
     workoutRepositoryProvider,
   );
@@ -37,6 +38,7 @@ final FutureProviderFamily<CompletedWorkoutDetails?, String>
     completedWorkoutDetailsProvider =
     FutureProvider.family<CompletedWorkoutDetails?, String>(
   (Ref ref, String workoutId) async {
+    ref.watch(workoutDataRevisionProvider);
     final WorkoutRepository workoutRepository = ref.watch(
       workoutRepositoryProvider,
     );
@@ -81,6 +83,7 @@ final FutureProviderFamily<PreviousExercisePerformance?, String>
     previousExercisePerformanceProvider =
     FutureProvider.family<PreviousExercisePerformance?, String>(
   (Ref ref, String exerciseId) async {
+    ref.watch(workoutDataRevisionProvider);
     final WorkoutRepository workoutRepository = ref.watch(
       workoutRepositoryProvider,
     );

@@ -188,14 +188,25 @@ class _ExerciseContent extends ConsumerWidget {
               child: FilledButton(
                 key: const ValueKey<String>('finish-workout-button'),
                 onPressed: () async {
-                  final Workout? completedWorkout = await ref
-                      .read(workoutCompletionControllerProvider)
-                      .finishWorkout(workoutId);
-                  if (!context.mounted || completedWorkout == null) return;
-                  context.goNamed(
-                    AppRoute.workoutSummary.name,
-                    pathParameters: <String, String>{'id': workoutId},
-                  );
+                  try {
+                    final Workout? completedWorkout = await ref
+                        .read(workoutCompletionControllerProvider)
+                        .finishWorkout(workoutId);
+                    if (!context.mounted || completedWorkout == null) return;
+                    context.goNamed(
+                      AppRoute.workoutSummary.name,
+                      pathParameters: <String, String>{'id': workoutId},
+                    );
+                  } catch (_) {
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Unable to save this workout. Please try again.',
+                        ),
+                      ),
+                    );
+                  }
                 },
                 child: const Text('Finish Workout'),
               ),

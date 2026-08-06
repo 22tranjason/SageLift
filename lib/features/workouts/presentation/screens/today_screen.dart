@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/router/app_router.dart';
 import '../../../check_ins/presentation/providers/daily_targets_controller.dart';
 import '../../domain/models/workout.dart';
+import '../../domain/services/workout_program.dart';
 import '../providers/today_workout_provider.dart';
 import '../providers/workout_completion_controller.dart';
 import '../widgets/workout_exercise_list.dart';
@@ -69,6 +70,17 @@ class TodayScreen extends ConsumerWidget {
                 'Next Workout',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  key: const ValueKey<String>('choose-workout-button'),
+                  onPressed: () {
+                    unawaited(_chooseWorkout(context, ref));
+                  },
+                  icon: const Icon(Icons.swap_horiz),
+                  label: const Text('Choose Workout'),
+                ),
+              ),
               const SizedBox(height: 8),
               todayWorkout.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
@@ -86,6 +98,13 @@ class TodayScreen extends ConsumerWidget {
                         workoutData.workout.name,
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
+                      Text(
+                        workoutData.isRecommended
+                            ? 'Recommended next'
+                            : 'Recommended next: '
+                                '${workoutData.recommendedWorkoutName}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
                       const SizedBox(height: 8),
                       WorkoutExerciseList(exercises: workoutData.exercises),
                       const SizedBox(height: 16),
@@ -93,19 +112,33 @@ class TodayScreen extends ConsumerWidget {
                         width: double.infinity,
                         child: FilledButton(
                           onPressed: () async {
-                            final Workout? startedWorkout = await ref
-                                .read(workoutCompletionControllerProvider)
-                                .startWorkout(workoutData.workout);
-                            if (!context.mounted || startedWorkout == null) {
-                              return;
+                            try {
+                              final Workout? startedWorkout = await ref
+                                  .read(workoutCompletionControllerProvider)
+                                  .startWorkout(workoutData.workout);
+                              if (!context.mounted || startedWorkout == null) {
+                                return;
+                              }
+                              unawaited(
+                                context.pushNamed(
+                                  AppRoute.workoutOverview.name,
+                                ),
+                              );
+                            } catch (_) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Unable to start workout.'),
+                                ),
+                              );
                             }
-                            unawaited(
-                              context.pushNamed(
-                                AppRoute.workoutOverview.name,
-                              ),
-                            );
                           },
-                          child: const Text('Start Workout'),
+                          child: Text(
+                            workoutData.workout.status ==
+                                    WorkoutStatus.inProgress
+                                ? 'Resume Workout'
+                                : 'Start Workout',
+                          ),
                         ),
                       ),
                     ],
@@ -154,6 +187,92 @@ class TodayScreen extends ConsumerWidget {
       'December',
     ];
     return '${weekdays[date.weekday - 1]}, ${date.day} ${months[date.month - 1]}';
+  }
+
+  Future<void> _chooseWorkout(BuildContext context, WidgetRef ref) async {
+    final String? workoutName = await showModalBottomSheet<String>(
+      context: context,
+      builder: (BuildContext sheetContext) {
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: <Widget>[
+              const ListTile(title: Text('Choose Workout')),
+              for (final String name in WorkoutProgram.workoutNames)
+                ListTile(
+                  title: Text(name),
+                  onTap: () => Navigator.of(sheetContext).pop(name),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+    if (workoutName == null || !context.mounted) return;
+    await _startSelectedWorkout(context, ref, workoutName);
+  }
+
+  Future<void> _startSelectedWorkout(
+    BuildContext context,
+    WidgetRef ref,
+    String workoutName, {
+    bool replaceInProgress = false,
+  }) async {
+    try {
+      final Workout? startedWorkout = await ref
+          .read(workoutCompletionControllerProvider)
+          .startSelectedWorkout(
+            workoutName,
+            replaceInProgress: replaceInProgress,
+          );
+      if (!context.mounted || startedWorkout == null) return;
+      await context.pushNamed(AppRoute.workoutOverview.name);
+    } on WorkoutAlreadyInProgressException catch (error) {
+      if (!context.mounted) return;
+      final bool confirmed = await _confirmReplaceInProgress(
+        context,
+        error.workout,
+      );
+      if (!confirmed || !context.mounted) return;
+      await _startSelectedWorkout(
+        context,
+        ref,
+        workoutName,
+        replaceInProgress: true,
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to select workout.')),
+      );
+    }
+  }
+
+  Future<bool> _confirmReplaceInProgress(
+    BuildContext context,
+    Workout activeWorkout,
+  ) async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (BuildContext dialogContext) => AlertDialog(
+            title: const Text('Replace active workout?'),
+            content: Text(
+              '${activeWorkout.name} is already in progress. '
+              'It will remain planned so you can return to it later.',
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('Choose workout'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
   }
 }
 

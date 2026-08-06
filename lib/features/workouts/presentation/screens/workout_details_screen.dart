@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../app/router/app_router.dart';
+import '../../domain/models/workout.dart';
 import '../providers/workout_completion_controller.dart';
 import '../providers/workout_history_provider.dart';
 
@@ -110,6 +113,20 @@ class WorkoutDetailsScreen extends ConsumerWidget {
                       ],
                     ),
                   ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      key: const ValueKey<String>('delete-workout-button'),
+                      onPressed: () => _deleteWorkout(
+                        context,
+                        ref,
+                        summary.workout,
+                      ),
+                      icon: const Icon(Icons.delete_outline),
+                      label: const Text('Delete Workout'),
+                    ),
+                  ),
                 ],
               ),
             );
@@ -135,6 +152,47 @@ class WorkoutDetailsScreen extends ConsumerWidget {
     final String weight = setDetail.set.weightKg?.toStringAsFixed(0) ?? '—';
     final String reps = setDetail.set.reps?.toString() ?? '—';
     return '$weight kg × $reps reps';
+  }
+
+  Future<void> _deleteWorkout(
+    BuildContext context,
+    WidgetRef ref,
+    Workout workout,
+  ) async {
+    final bool confirmed = await showDialog<bool>(
+          context: context,
+          builder: (BuildContext dialogContext) => AlertDialog(
+            title: const Text('Delete workout?'),
+            content: Text(
+              'Delete ${workout.name} from ${_dateLabel(workout.completedAt)}? '
+              'This only removes this workout record.',
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed || !context.mounted) return;
+    try {
+      await ref
+          .read(workoutCompletionControllerProvider)
+          .deleteCompletedWorkout(workout.id);
+      if (!context.mounted) return;
+      context.goNamed(AppRoute.workoutHistory.name);
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to delete workout.')),
+      );
+    }
   }
 }
 

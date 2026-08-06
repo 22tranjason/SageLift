@@ -20,9 +20,15 @@ final Provider<ExerciseRepository> exerciseRepositoryProvider =
       'ExerciseRepository must be provided during bootstrap.');
 });
 
+/// Changes whenever workout persistence mutates, refreshing dependent views.
+final StateProvider<int> workoutDataRevisionProvider = StateProvider<int>(
+  (Ref ref) => 0,
+);
+
 /// Loads the active or next planned programme workout for the Today screen.
 final FutureProvider<TodayWorkout?> todayWorkoutProvider =
     FutureProvider<TodayWorkout?>((Ref ref) async {
+  ref.watch(workoutDataRevisionProvider);
   final WorkoutRepository workoutRepository = ref.watch(
     workoutRepositoryProvider,
   );
@@ -37,12 +43,18 @@ final FutureProvider<TodayWorkout?> todayWorkoutProvider =
     final Exercise? exercise = await exerciseRepository.getById(exerciseId);
     if (exercise != null) exercises.add(exercise);
   }
-  return TodayWorkout(workout: workout, exercises: exercises);
+  return TodayWorkout(
+    workout: workout,
+    exercises: exercises,
+    isRecommended: workout.status != WorkoutStatus.inProgress,
+    recommendedWorkoutName: WorkoutProgram.recommendedNextWorkoutName(workouts),
+  );
 });
 
 /// Loads the most recently completed workout for the Today screen.
 final FutureProvider<Workout?> lastCompletedWorkoutProvider =
     FutureProvider<Workout?>((Ref ref) async {
+  ref.watch(workoutDataRevisionProvider);
   final WorkoutRepository workoutRepository = ref.watch(
     workoutRepositoryProvider,
   );
@@ -64,11 +76,22 @@ DateTime _completionDate(Workout workout) {
 /// Presentation-ready workout data with exercises retained in workout order.
 class TodayWorkout {
   /// Creates Today data from a workout and its resolved exercises.
-  TodayWorkout({required this.workout, required List<Exercise> exercises})
-      : _exercises = List<Exercise>.unmodifiable(exercises);
+  TodayWorkout({
+    required this.workout,
+    required List<Exercise> exercises,
+    required this.isRecommended,
+    required this.recommendedWorkoutName,
+  }) : _exercises = List<Exercise>.unmodifiable(exercises);
 
   /// Workout selected for the current day.
   final Workout workout;
+
+  /// Whether [workout] is the automatic program recommendation rather than an
+  /// already active manually selected session.
+  final bool isRecommended;
+
+  /// Program name inferred solely from the latest valid completion.
+  final String recommendedWorkoutName;
 
   final List<Exercise> _exercises;
 

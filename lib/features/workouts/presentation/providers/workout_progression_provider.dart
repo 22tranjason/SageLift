@@ -39,6 +39,7 @@ final FutureProviderFamily<ExerciseProgressionGuidance?,
     FutureProvider.family<ExerciseProgressionGuidance?,
         ExerciseProgressionRequest>(
   (Ref ref, ExerciseProgressionRequest request) async {
+    ref.watch(workoutDataRevisionProvider);
     final WorkoutRepository workoutRepository = ref.watch(
       workoutRepositoryProvider,
     );
@@ -70,6 +71,7 @@ final FutureProviderFamily<List<WorkoutExerciseProgression>, String>
     workoutProgressionSummaryProvider =
     FutureProvider.family<List<WorkoutExerciseProgression>, String>(
   (Ref ref, String workoutId) async {
+    ref.watch(workoutDataRevisionProvider);
     final WorkoutRepository workoutRepository = ref.watch(
       workoutRepositoryProvider,
     );
