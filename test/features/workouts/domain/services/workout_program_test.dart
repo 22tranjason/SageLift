@@ -80,15 +80,76 @@ void main() {
 
     expect(WorkoutProgram.nextIncompleteWorkout(workouts)?.name, 'Pull B');
   });
+
+  test('CrossFit starts at A without CrossFit history', () {
+    expect(
+      WorkoutProgram.recommendedNextWorkoutName(
+        const <Workout>[],
+        track: WorkoutTrack.crossFit,
+      ),
+      'CrossFit A',
+    );
+  });
+
+  test('CrossFit loops independently from A through F', () {
+    final List<String> expected = <String>[
+      'CrossFit B',
+      'CrossFit C',
+      'CrossFit D',
+      'CrossFit E',
+      'CrossFit F',
+      'CrossFit A',
+    ];
+    for (int index = 0;
+        index < WorkoutProgram.crossFitWorkoutNames.length;
+        index++) {
+      expect(
+        WorkoutProgram.recommendedNextWorkoutName(
+          <Workout>[
+            _completed(
+              WorkoutProgram.crossFitWorkoutNames[index],
+              DateTime.utc(2026, 8, index + 1),
+              track: WorkoutTrack.crossFit,
+            ),
+          ],
+          track: WorkoutTrack.crossFit,
+        ),
+        expected[index],
+      );
+    }
+  });
+
+  test('CrossFit and PPL completions do not advance each other', () {
+    final List<Workout> history = <Workout>[
+      _completed('Pull A', DateTime.utc(2026, 8, 1),
+          track: WorkoutTrack.strengthPpl),
+      _completed('CrossFit C', DateTime.utc(2026, 8, 2),
+          track: WorkoutTrack.crossFit),
+    ];
+
+    expect(WorkoutProgram.recommendedNextWorkoutName(history), 'Legs A');
+    expect(
+      WorkoutProgram.recommendedNextWorkoutName(
+        history,
+        track: WorkoutTrack.crossFit,
+      ),
+      'CrossFit D',
+    );
+  });
 }
 
-Workout _completed(String name, DateTime completedAt) {
+Workout _completed(
+  String name,
+  DateTime completedAt, {
+  WorkoutTrack track = WorkoutTrack.strengthPpl,
+}) {
   return Workout(
     id: '${name.toLowerCase().replaceAll(' ', '-')}-${completedAt.microsecondsSinceEpoch}',
     name: name,
     scheduledDate: DateTime.utc(2026, 8, 1),
     status: WorkoutStatus.completed,
     completedAt: completedAt,
+    track: track,
   );
 }
 

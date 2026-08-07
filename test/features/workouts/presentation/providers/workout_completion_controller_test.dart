@@ -86,6 +86,69 @@ void main() {
     );
   });
 
+  test('manual CrossFit selection starts its independent track', () async {
+    final _MemoryWorkoutRepository repository = _MemoryWorkoutRepository(
+      <Workout>[..._programTemplates(), ..._crossFitTemplates()],
+    );
+    final WorkoutCompletionController controller = _controller(repository);
+
+    final Workout? selected =
+        await controller.startSelectedWorkout('CrossFit B');
+
+    expect(selected?.track, WorkoutTrack.crossFit);
+    expect(selected?.status, WorkoutStatus.inProgress);
+    expect(
+      WorkoutProgram.recommendedNextWorkoutName(await repository.getAll()),
+      'Push A',
+    );
+  });
+
+  test('CrossFit completion advances only CrossFit', () async {
+    final _MemoryWorkoutRepository repository = _MemoryWorkoutRepository(
+      <Workout>[..._programTemplates(), ..._crossFitTemplates()],
+    );
+    final WorkoutCompletionController controller = _controller(repository);
+    final Workout? selected =
+        await controller.startSelectedWorkout('CrossFit B');
+
+    await controller.finishWorkout(selected!.id);
+
+    final List<Workout> workouts = await repository.getAll();
+    expect(WorkoutProgram.recommendedNextWorkoutName(workouts), 'Push A');
+    expect(
+      WorkoutProgram.recommendedNextWorkoutName(
+        workouts,
+        track: WorkoutTrack.crossFit,
+      ),
+      'CrossFit C',
+    );
+  });
+
+  test('deleting CrossFit history recalculates only CrossFit', () async {
+    final Workout ppl = _completed('Pull A', DateTime.utc(2026, 8, 1, 7));
+    final Workout crossFit = _completed(
+      'CrossFit B',
+      DateTime.utc(2026, 8, 2, 7),
+      track: WorkoutTrack.crossFit,
+    );
+    final _MemoryWorkoutRepository repository = _MemoryWorkoutRepository(
+      <Workout>[..._programTemplates(), ..._crossFitTemplates(), ppl, crossFit],
+    );
+    final WorkoutCompletionController controller = _controller(repository);
+
+    await controller.deleteCompletedWorkout(crossFit.id);
+
+    final List<Workout> workouts = await repository.getAll();
+    expect(WorkoutProgram.recommendedNextWorkoutName(workouts), 'Legs A');
+    expect(
+      WorkoutProgram.recommendedNextWorkoutName(
+        workouts,
+        track: WorkoutTrack.crossFit,
+      ),
+      'CrossFit A',
+    );
+  });
+
   test('deleting latest history recalculates the next workout', () async {
     final Workout pushA = _completed('Push A', DateTime.utc(2026, 8, 1, 7));
     final Workout pullA = _completed('Pull A', DateTime.utc(2026, 8, 2, 7));
@@ -146,6 +209,7 @@ WorkoutCompletionController _controller(_MemoryWorkoutRepository repository) {
     workoutRepository: repository,
     onWorkoutChanged: () {},
     clearSetProgress: () {},
+    clearConditioningProgress: () {},
     readSetProgress: () => <String, WorkoutSetProgress>{},
     now: () => DateTime.utc(2026, 8, 6, 7),
   );
@@ -159,13 +223,30 @@ List<Workout> _programTemplates() {
       .toList(growable: false);
 }
 
-Workout _workout(String name, WorkoutStatus status) {
+List<Workout> _crossFitTemplates() {
+  return WorkoutProgram.crossFitWorkoutNames
+      .map(
+        (String name) => _workout(
+          name,
+          WorkoutStatus.planned,
+          track: WorkoutTrack.crossFit,
+        ),
+      )
+      .toList(growable: false);
+}
+
+Workout _workout(
+  String name,
+  WorkoutStatus status, {
+  WorkoutTrack track = WorkoutTrack.strengthPpl,
+}) {
   final String id = name.toLowerCase().replaceAll(' ', '-');
   return Workout(
     id: id,
     name: name,
     scheduledDate: DateTime.utc(2000),
     status: status,
+    track: track,
     exerciseIds: const <String>['exercise-1'],
     sets: <WorkoutSet>[
       WorkoutSet(
@@ -181,8 +262,16 @@ Workout _workout(String name, WorkoutStatus status) {
   );
 }
 
-Workout _completed(String name, DateTime completedAt) {
-  final Workout planned = _workout(name, WorkoutStatus.planned);
+Workout _completed(
+  String name,
+  DateTime completedAt, {
+  WorkoutTrack track = WorkoutTrack.strengthPpl,
+}) {
+  final Workout planned = _workout(
+    name,
+    WorkoutStatus.planned,
+    track: track,
+  );
   return planned.copyWith(
     id: '${planned.id}-${completedAt.microsecondsSinceEpoch}',
     status: WorkoutStatus.completed,

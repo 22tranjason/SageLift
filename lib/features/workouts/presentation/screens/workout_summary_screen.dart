@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/app_router.dart';
+import '../../domain/models/conditioning.dart';
 import '../../domain/services/exercise_progression_service.dart';
 import '../providers/workout_completion_controller.dart';
 import '../providers/workout_progression_provider.dart';
@@ -74,6 +75,18 @@ class WorkoutSummaryScreen extends ConsumerWidget {
                     label: 'Total volume',
                     value: '${value.totalVolumeKg.toStringAsFixed(0)} kg',
                   ),
+                  if (value.workout.conditioningResult != null) ...<Widget>[
+                    const SizedBox(height: 16),
+                    Text(
+                      'Conditioning',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    _ConditioningResultCard(
+                      result: value.workout.conditioningResult!,
+                      prescribedRounds:
+                          value.workout.conditioningPlan?.prescribedRounds,
+                    ),
+                  ],
                   const SizedBox(height: 24),
                   Text(
                     'Completed exercises',
@@ -192,6 +205,45 @@ class WorkoutSummaryScreen extends ConsumerWidget {
       case ExerciseProgressionStatus.belowPrevious:
         return 'Below previous';
     }
+  }
+}
+
+class _ConditioningResultCard extends StatelessWidget {
+  const _ConditioningResultCard({
+    required this.result,
+    required this.prescribedRounds,
+  });
+
+  final ConditioningResult result;
+  final int? prescribedRounds;
+
+  @override
+  Widget build(BuildContext context) {
+    final String rounds = '${result.roundsCompleted} rounds'
+        '${result.additionalReps > 0 ? ' + ${result.additionalReps} reps' : ''}';
+    final Duration? time = result.completionTime;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            if (prescribedRounds != null)
+              Text('Target: $prescribedRounds rounds'),
+            Text('Result: $rounds'),
+            if (time != null)
+              Text(
+                'Time: ${time.inMinutes}:'
+                '${(time.inSeconds % 60).toString().padLeft(2, '0')}',
+              ),
+            if (result.weightKg != null)
+              Text('Weight: ${result.weightKg!.toStringAsFixed(0)} kg'),
+            if (result.scaling != null) Text('Scaling: ${result.scaling}'),
+            Text(result.isCompleted ? 'Completed' : 'Not completed'),
+          ],
+        ),
+      ),
+    );
   }
 }
 

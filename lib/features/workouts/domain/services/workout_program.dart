@@ -1,11 +1,11 @@
 import '../models/workout.dart';
 import '../models/workout_set.dart';
 
-/// Defines SageLift's repeating Push/Pull/Legs workout sequence.
+/// Selects each independent repeating SageLift workout programme.
 class WorkoutProgram {
   WorkoutProgram._();
 
-  /// The fixed programme order, which repeats indefinitely after Legs B.
+  /// Fixed strength programme order, which repeats indefinitely after Legs B.
   static const List<String> workoutNames = <String>[
     'Push A',
     'Pull A',
@@ -15,62 +15,117 @@ class WorkoutProgram {
     'Legs B',
   ];
 
-  /// Whether [workoutName] identifies one of SageLift's program workouts.
+  /// Fixed CrossFit programme order, which repeats indefinitely after F.
+  static const List<String> crossFitWorkoutNames = <String>[
+    'CrossFit A',
+    'CrossFit B',
+    'CrossFit C',
+    'CrossFit D',
+    'CrossFit E',
+    'CrossFit F',
+  ];
+
+  /// Names in programme order for [track].
+  static List<String> workoutNamesFor(WorkoutTrack track) {
+    return track == WorkoutTrack.crossFit ? crossFitWorkoutNames : workoutNames;
+  }
+
+  /// Whether [workoutName] is known to either built-in programme.
   static bool isProgramWorkoutName(String workoutName) {
-    return workoutNames.contains(workoutName);
+    return workoutNames.contains(workoutName) ||
+        crossFitWorkoutNames.contains(workoutName);
   }
 
-  /// Returns the programme workout that follows [workoutName], looping forever.
-  ///
-  /// Returns null when [workoutName] is not part of this programme.
-  static String? nextWorkoutName(String workoutName) {
-    final int currentIndex = workoutNames.indexOf(workoutName);
+  /// Whether [workoutName] belongs to [track].
+  static bool isProgramWorkoutNameForTrack(
+    String workoutName,
+    WorkoutTrack track,
+  ) {
+    return workoutNamesFor(track).contains(workoutName);
+  }
+
+  /// Returns the programme track inferred from its known workout name.
+  static WorkoutTrack? trackForWorkoutName(String workoutName) {
+    if (workoutNames.contains(workoutName)) {
+      return WorkoutTrack.strengthPpl;
+    }
+    if (crossFitWorkoutNames.contains(workoutName)) {
+      return WorkoutTrack.crossFit;
+    }
+    return null;
+  }
+
+  /// Returns the following workout in [track], looping continuously.
+  static String? nextWorkoutName(
+    String workoutName, {
+    WorkoutTrack? track,
+  }) {
+    final WorkoutTrack? resolvedTrack =
+        track ?? trackForWorkoutName(workoutName);
+    if (resolvedTrack == null) return null;
+    final List<String> names = workoutNamesFor(resolvedTrack);
+    final int currentIndex = names.indexOf(workoutName);
     if (currentIndex == -1) return null;
-    return workoutNames[(currentIndex + 1) % workoutNames.length];
+    return names[(currentIndex + 1) % names.length];
   }
 
-  /// Returns the last valid program completion, using its completion timestamp.
-  ///
-  /// Planned records, non-program workouts, and legacy completed records without
-  /// a completion timestamp deliberately do not influence the program position.
-  static Workout? latestValidCompletion(List<Workout> workouts) {
+  /// Returns the latest valid completed programme session for [track].
+  static Workout? latestValidCompletion(
+    List<Workout> workouts, {
+    WorkoutTrack track = WorkoutTrack.strengthPpl,
+  }) {
     final List<Workout> completions = workouts
-        .where(isValidCompletedProgramWorkout)
+        .where((Workout workout) =>
+            isValidCompletedProgramWorkout(workout, track: track))
         .toList(growable: false)
       ..sort(_compareCompletionDescending);
     return completions.isEmpty ? null : completions.first;
   }
 
-  /// Whether [workout] is a timestamped completion from this program.
-  static bool isValidCompletedProgramWorkout(Workout workout) {
+  /// Whether [workout] is a timestamped completion belonging to [track].
+  static bool isValidCompletedProgramWorkout(
+    Workout workout, {
+    WorkoutTrack track = WorkoutTrack.strengthPpl,
+  }) {
     return workout.status == WorkoutStatus.completed &&
         workout.completedAt != null &&
-        isProgramWorkoutName(workout.name);
+        workout.track == track &&
+        isProgramWorkoutNameForTrack(workout.name, track);
   }
 
-  /// Selects the next recommended program name from persisted completion history.
-  ///
-  /// A new program begins at Push A. Only the latest valid completion matters.
-  static String recommendedNextWorkoutName(List<Workout> workouts) {
-    final Workout? latestCompletion = latestValidCompletion(workouts);
-    if (latestCompletion == null) return workoutNames.first;
-    return nextWorkoutName(latestCompletion.name) ?? workoutNames.first;
+  /// Infers the next programme workout solely from [track]'s completed history.
+  static String recommendedNextWorkoutName(
+    List<Workout> workouts, {
+    WorkoutTrack track = WorkoutTrack.strengthPpl,
+  }) {
+    final Workout? latestCompletion =
+        latestValidCompletion(workouts, track: track);
+    if (latestCompletion == null) return workoutNamesFor(track).first;
+    return nextWorkoutName(latestCompletion.name, track: track) ??
+        workoutNamesFor(track).first;
   }
 
-  /// Selects the active workout, or the planned session matching the recommendation.
-  ///
-  /// This intentionally ignores stale planned sessions for other program names.
-  static Workout? nextIncompleteWorkout(List<Workout> workouts) {
+  /// Selects the active session or planned recommended session for [track].
+  static Workout? nextIncompleteWorkout(
+    List<Workout> workouts, {
+    WorkoutTrack track = WorkoutTrack.strengthPpl,
+  }) {
     final List<Workout> inProgress = workouts
-        .where((Workout workout) => workout.status == WorkoutStatus.inProgress)
+        .where(
+          (Workout workout) =>
+              workout.track == track &&
+              workout.status == WorkoutStatus.inProgress,
+        )
         .toList(growable: false)
       ..sort(_compareActiveDescending);
     if (inProgress.isNotEmpty) return inProgress.first;
 
-    final String recommendedName = recommendedNextWorkoutName(workouts);
+    final String recommendedName =
+        recommendedNextWorkoutName(workouts, track: track);
     final List<Workout> plannedRecommended = workouts
         .where(
           (Workout workout) =>
+              workout.track == track &&
               workout.status == WorkoutStatus.planned &&
               workout.name == recommendedName,
         )
@@ -79,9 +134,7 @@ class WorkoutProgram {
     return plannedRecommended.isEmpty ? null : plannedRecommended.first;
   }
 
-  /// Creates a new planned session from a persisted program workout [template].
-  ///
-  /// Recorded set values are cleared, while programmed set targets and notes remain.
+  /// Creates a planned session from a persisted programme [template].
   static Workout createPlannedSession({
     required Workout template,
     required String id,
@@ -104,6 +157,7 @@ class WorkoutProgram {
       status: WorkoutStatus.planned,
       startedAt: null,
       completedAt: null,
+      conditioningResult: null,
     );
   }
 

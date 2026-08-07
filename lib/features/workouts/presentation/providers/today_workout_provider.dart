@@ -36,7 +36,10 @@ final FutureProvider<TodayWorkout?> todayWorkoutProvider =
     exerciseRepositoryProvider,
   );
   final List<Workout> workouts = await workoutRepository.getAll();
-  final Workout? workout = WorkoutProgram.nextIncompleteWorkout(workouts);
+  final Workout? workout = WorkoutProgram.nextIncompleteWorkout(
+    workouts,
+    track: WorkoutTrack.strengthPpl,
+  );
   if (workout == null) return null;
   final List<Exercise> exercises = <Exercise>[];
   for (final String exerciseId in workout.exerciseIds) {
@@ -47,9 +50,73 @@ final FutureProvider<TodayWorkout?> todayWorkoutProvider =
     workout: workout,
     exercises: exercises,
     isRecommended: workout.status != WorkoutStatus.inProgress,
-    recommendedWorkoutName: WorkoutProgram.recommendedNextWorkoutName(workouts),
+    recommendedWorkoutName: WorkoutProgram.recommendedNextWorkoutName(
+      workouts,
+      track: WorkoutTrack.strengthPpl,
+    ),
   );
 });
+
+/// Loads the active or next planned CrossFit workout independently of PPL.
+final FutureProvider<TodayWorkout?> crossFitTodayWorkoutProvider =
+    FutureProvider<TodayWorkout?>((Ref ref) async {
+  ref.watch(workoutDataRevisionProvider);
+  final WorkoutRepository workoutRepository =
+      ref.watch(workoutRepositoryProvider);
+  final ExerciseRepository exerciseRepository =
+      ref.watch(exerciseRepositoryProvider);
+  final List<Workout> workouts = await workoutRepository.getAll();
+  final Workout? workout = WorkoutProgram.nextIncompleteWorkout(
+    workouts,
+    track: WorkoutTrack.crossFit,
+  );
+  if (workout == null) return null;
+  return _todayWorkoutFor(
+    workout: workout,
+    workouts: workouts,
+    exerciseRepository: exerciseRepository,
+  );
+});
+
+/// Loads a selected session for overview and focused-exercise routes.
+final FutureProviderFamily<TodayWorkout?, String> workoutSessionProvider =
+    FutureProvider.family<TodayWorkout?, String>(
+  (Ref ref, String workoutId) async {
+    ref.watch(workoutDataRevisionProvider);
+    final WorkoutRepository workoutRepository =
+        ref.watch(workoutRepositoryProvider);
+    final ExerciseRepository exerciseRepository =
+        ref.watch(exerciseRepositoryProvider);
+    final Workout? workout = await workoutRepository.getById(workoutId);
+    if (workout == null) return null;
+    return _todayWorkoutFor(
+      workout: workout,
+      workouts: await workoutRepository.getAll(),
+      exerciseRepository: exerciseRepository,
+    );
+  },
+);
+
+Future<TodayWorkout> _todayWorkoutFor({
+  required Workout workout,
+  required List<Workout> workouts,
+  required ExerciseRepository exerciseRepository,
+}) async {
+  final List<Exercise> exercises = <Exercise>[];
+  for (final String exerciseId in workout.exerciseIds) {
+    final Exercise? exercise = await exerciseRepository.getById(exerciseId);
+    if (exercise != null) exercises.add(exercise);
+  }
+  return TodayWorkout(
+    workout: workout,
+    exercises: exercises,
+    isRecommended: workout.status != WorkoutStatus.inProgress,
+    recommendedWorkoutName: WorkoutProgram.recommendedNextWorkoutName(
+      workouts,
+      track: workout.track,
+    ),
+  );
+}
 
 /// Loads the most recently completed workout for the Today screen.
 final FutureProvider<Workout?> lastCompletedWorkoutProvider =

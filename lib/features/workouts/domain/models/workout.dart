@@ -1,4 +1,14 @@
+import 'conditioning.dart';
 import 'workout_set.dart';
+
+/// The independent training programme to which a workout belongs.
+enum WorkoutTrack {
+  /// Jason's repeating Push/Pull/Legs strength programme.
+  strengthPpl,
+
+  /// Jason's repeating CrossFit programme.
+  crossFit,
+}
 
 /// The lifecycle state of a scheduled workout.
 enum WorkoutStatus {
@@ -28,6 +38,10 @@ class Workout {
     this.startedAt,
     this.completedAt,
     this.notes,
+    this.track = WorkoutTrack.strengthPpl,
+    this.warmUp,
+    this.conditioningPlan,
+    this.conditioningResult,
   })  : _exerciseIds = List<String>.unmodifiable(exerciseIds),
         _sets = List<WorkoutSet>.unmodifiable(sets);
 
@@ -60,6 +74,18 @@ class Workout {
   /// Optional free-form notes for the workout.
   final String? notes;
 
+  /// Independent programme sequence that owns this workout.
+  final WorkoutTrack track;
+
+  /// Optional warm-up guidance, used by workouts that do not log warm-up sets.
+  final String? warmUp;
+
+  /// Optional conditioning prescription, used by CrossFit workouts.
+  final ConditioningPlan? conditioningPlan;
+
+  /// Optional factual conditioning result recorded when the workout finishes.
+  final ConditioningResult? conditioningResult;
+
   static const Object _unset = Object();
 
   /// Returns this workout with selected values replaced.
@@ -76,6 +102,10 @@ class Workout {
     Object? startedAt = _unset,
     Object? completedAt = _unset,
     Object? notes = _unset,
+    WorkoutTrack? track,
+    Object? warmUp = _unset,
+    Object? conditioningPlan = _unset,
+    Object? conditioningResult = _unset,
   }) {
     return Workout(
       id: id ?? this.id,
@@ -91,6 +121,14 @@ class Workout {
           ? this.completedAt
           : completedAt as DateTime?,
       notes: identical(notes, _unset) ? this.notes : notes as String?,
+      track: track ?? this.track,
+      warmUp: identical(warmUp, _unset) ? this.warmUp : warmUp as String?,
+      conditioningPlan: identical(conditioningPlan, _unset)
+          ? this.conditioningPlan
+          : conditioningPlan as ConditioningPlan?,
+      conditioningResult: identical(conditioningResult, _unset)
+          ? this.conditioningResult
+          : conditioningResult as ConditioningResult?,
     );
   }
 
@@ -105,7 +143,11 @@ class Workout {
         other.status == status &&
         other.startedAt == startedAt &&
         other.completedAt == completedAt &&
-        other.notes == notes;
+        other.notes == notes &&
+        other.track == track &&
+        other.warmUp == warmUp &&
+        other.conditioningPlan == conditioningPlan &&
+        other.conditioningResult == conditioningResult;
   }
 
   @override
@@ -119,6 +161,10 @@ class Workout {
         startedAt,
         completedAt,
         notes,
+        track,
+        warmUp,
+        conditioningPlan,
+        conditioningResult,
       );
 }
 

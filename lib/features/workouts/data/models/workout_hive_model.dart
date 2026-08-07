@@ -13,6 +13,19 @@ class WorkoutHiveModel {
     this.startedAtMilliseconds,
     this.completedAtMilliseconds,
     this.notes,
+    this.trackIndex = 0,
+    this.warmUp,
+    this.conditioningFormatIndex,
+    this.conditioningTitle,
+    this.conditioningInstructions,
+    this.prescribedRounds,
+    this.conditioningDurationMinutes,
+    this.roundsCompleted,
+    this.additionalReps,
+    this.completionTimeMilliseconds,
+    this.conditioningWeightKg,
+    this.conditioningScaling,
+    this.conditioningCompleted,
   })  : exerciseIds = List<String>.unmodifiable(exerciseIds),
         sets = List<WorkoutSetHiveModel>.unmodifiable(sets);
 
@@ -42,4 +55,43 @@ class WorkoutHiveModel {
 
   /// Optional stored workout notes.
   final String? notes;
+
+  /// Stored index of the independent workout track; omitted legacy data is PPL.
+  final int trackIndex;
+
+  /// Optional non-logged warm-up instructions.
+  final String? warmUp;
+
+  /// Stored conditioning-format enum index, when this workout has conditioning.
+  final int? conditioningFormatIndex;
+
+  /// Optional conditioning display title.
+  final String? conditioningTitle;
+
+  /// Optional conditioning movement instructions.
+  final String? conditioningInstructions;
+
+  /// Optional prescribed conditioning-round count.
+  final int? prescribedRounds;
+
+  /// Optional AMRAP or EMOM duration in minutes.
+  final int? conditioningDurationMinutes;
+
+  /// Recorded number of completed conditioning rounds.
+  final int? roundsCompleted;
+
+  /// Recorded repetitions completed after the last full conditioning round.
+  final int? additionalReps;
+
+  /// Recorded conditioning duration in milliseconds.
+  final int? completionTimeMilliseconds;
+
+  /// Optional load used in the conditioning section.
+  final double? conditioningWeightKg;
+
+  /// Optional scaling or modification used in conditioning.
+  final String? conditioningScaling;
+
+  /// Whether the prescribed conditioning work was completed.
+  final bool? conditioningCompleted;
 }

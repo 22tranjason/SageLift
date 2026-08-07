@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/app_router.dart';
+import '../../domain/models/conditioning.dart';
+import '../../domain/models/workout.dart';
 import '../providers/workout_history_provider.dart';
 
 /// Lists persisted completed workouts with their calculated statistics.
@@ -46,6 +48,11 @@ class WorkoutHistoryScreen extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
                         const SizedBox(height: 4),
+                        Text(
+                          item.workout.track == WorkoutTrack.crossFit
+                              ? 'CrossFit'
+                              : 'Strength — PPL',
+                        ),
                         Text(_dateLabel(item.workout.completedAt)),
                         Text(
                             'Duration: ${_durationLabel(item.summary.duration)}'),
@@ -57,6 +64,8 @@ class WorkoutHistoryScreen extends ConsumerWidget {
                           'Volume: '
                           '${item.summary.totalVolumeKg.toStringAsFixed(0)} kg',
                         ),
+                        if (item.workout.conditioningResult != null)
+                          Text(_conditioningLabel(item.workout)),
                       ],
                     ),
                     onTap: () {
@@ -86,5 +95,17 @@ class WorkoutHistoryScreen extends ConsumerWidget {
 
   String _durationLabel(Duration duration) {
     return '${duration.inMinutes} min';
+  }
+
+  String _conditioningLabel(Workout workout) {
+    final ConditioningResult result = workout.conditioningResult!;
+    final String rounds = '${result.roundsCompleted} rounds'
+        '${result.additionalReps > 0 ? ' + ${result.additionalReps} reps' : ''}';
+    final String time = result.completionTime == null
+        ? ''
+        : ' • ${result.completionTime!.inMinutes}:'
+            '${(result.completionTime!.inSeconds % 60).toString().padLeft(2, '0')}';
+    final String scaling = result.scaling == null ? '' : ' • ${result.scaling}';
+    return '$rounds$time$scaling';
   }
 }

@@ -9,12 +9,15 @@ import '../widgets/workout_exercise_list.dart';
 /// Temporary pre-workout route showing the selected workout and exercises.
 class WorkoutOverviewScreen extends ConsumerWidget {
   /// Creates the workout overview screen.
-  const WorkoutOverviewScreen({super.key});
+  const WorkoutOverviewScreen({required this.workoutId, super.key});
+
+  /// Stable identifier of the selected workout session.
+  final String workoutId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final AsyncValue<TodayWorkout?> todayWorkout = ref.watch(
-      todayWorkoutProvider,
+      workoutSessionProvider(workoutId),
     );
 
     return Scaffold(
@@ -45,7 +48,10 @@ class WorkoutOverviewScreen extends ConsumerWidget {
                       onExerciseTap: (int index) {
                         context.pushNamed(
                           AppRoute.exercise.name,
-                          pathParameters: <String, String>{'index': '$index'},
+                          pathParameters: <String, String>{
+                            'id': workoutId,
+                            'index': '$index',
+                          },
                         );
                       },
                     ),

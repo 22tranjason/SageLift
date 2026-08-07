@@ -54,20 +54,25 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((Ref ref) {
         },
       ),
       GoRoute(
-        path: '/workout-overview',
+        path: '/workout-overview/:id',
         name: AppRoute.workoutOverview.name,
         builder: (BuildContext context, GoRouterState state) {
-          return const WorkoutOverviewScreen();
+          return WorkoutOverviewScreen(
+            workoutId: state.pathParameters['id'] ?? '',
+          );
         },
       ),
       GoRoute(
-        path: '/workout-overview/exercise/:index',
+        path: '/workout-overview/:id/exercise/:index',
         name: AppRoute.exercise.name,
         builder: (BuildContext context, GoRouterState state) {
           final int? exerciseIndex = int.tryParse(
             state.pathParameters['index'] ?? '',
           );
-          return ExerciseScreen(exerciseIndex: exerciseIndex ?? -1);
+          return ExerciseScreen(
+            workoutId: state.pathParameters['id'] ?? '',
+            exerciseIndex: exerciseIndex ?? -1,
+          );
         },
       ),
       GoRoute(

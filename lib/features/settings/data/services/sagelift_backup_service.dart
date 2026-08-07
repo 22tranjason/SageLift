@@ -264,6 +264,19 @@ Map<String, Object?> _workoutToJson(WorkoutHiveModel value) =>
       'startedAtMilliseconds': value.startedAtMilliseconds,
       'completedAtMilliseconds': value.completedAtMilliseconds,
       'notes': value.notes,
+      'trackIndex': value.trackIndex,
+      'warmUp': value.warmUp,
+      'conditioningFormatIndex': value.conditioningFormatIndex,
+      'conditioningTitle': value.conditioningTitle,
+      'conditioningInstructions': value.conditioningInstructions,
+      'prescribedRounds': value.prescribedRounds,
+      'conditioningDurationMinutes': value.conditioningDurationMinutes,
+      'roundsCompleted': value.roundsCompleted,
+      'additionalReps': value.additionalReps,
+      'completionTimeMilliseconds': value.completionTimeMilliseconds,
+      'conditioningWeightKg': value.conditioningWeightKg,
+      'conditioningScaling': value.conditioningScaling,
+      'conditioningCompleted': value.conditioningCompleted,
     };
 
 WorkoutHiveModel _workoutFromJson(Map<String, dynamic> value) =>
@@ -277,6 +290,21 @@ WorkoutHiveModel _workoutFromJson(Map<String, dynamic> value) =>
       startedAtMilliseconds: _nullableInt(value, 'startedAtMilliseconds'),
       completedAtMilliseconds: _nullableInt(value, 'completedAtMilliseconds'),
       notes: value['notes'] as String?,
+      trackIndex: _nullableInt(value, 'trackIndex') ?? 0,
+      warmUp: value['warmUp'] as String?,
+      conditioningFormatIndex: _nullableInt(value, 'conditioningFormatIndex'),
+      conditioningTitle: value['conditioningTitle'] as String?,
+      conditioningInstructions: value['conditioningInstructions'] as String?,
+      prescribedRounds: _nullableInt(value, 'prescribedRounds'),
+      conditioningDurationMinutes:
+          _nullableInt(value, 'conditioningDurationMinutes'),
+      roundsCompleted: _nullableInt(value, 'roundsCompleted'),
+      additionalReps: _nullableInt(value, 'additionalReps'),
+      completionTimeMilliseconds:
+          _nullableInt(value, 'completionTimeMilliseconds'),
+      conditioningWeightKg: _nullableDouble(value, 'conditioningWeightKg'),
+      conditioningScaling: value['conditioningScaling'] as String?,
+      conditioningCompleted: _nullableBool(value, 'conditioningCompleted'),
     );
 
 Map<String, Object?> _setToJson(WorkoutSetHiveModel value) => <String, Object?>{
@@ -436,6 +464,15 @@ double? _nullableDouble(Map<String, dynamic> value, String key) {
 
 bool _bool(Map<String, dynamic> value, String key) {
   final Object? result = value[key];
+  if (result is! bool) {
+    throw BackupFormatException('The backup has invalid $key.');
+  }
+  return result;
+}
+
+bool? _nullableBool(Map<String, dynamic> value, String key) {
+  final Object? result = value[key];
+  if (result == null) return null;
   if (result is! bool) {
     throw BackupFormatException('The backup has invalid $key.');
   }

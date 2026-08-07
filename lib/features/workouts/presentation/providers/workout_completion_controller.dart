@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../domain/models/conditioning.dart';
 import '../../domain/models/exercise.dart';
 import '../../domain/models/workout.dart';
 import '../../domain/models/workout_set.dart';
@@ -7,6 +8,7 @@ import '../../domain/repositories/exercise_repository.dart';
 import '../../domain/repositories/workout_repository.dart';
 import '../../domain/services/workout_program.dart';
 import 'today_workout_provider.dart';
+import 'workout_conditioning_progress_controller.dart';
 import 'workout_set_progress_controller.dart';
 
 /// Coordinates the persisted start and completion state of the active workout.
@@ -20,6 +22,8 @@ final Provider<WorkoutCompletionController>
     },
     clearSetProgress:
         ref.read(workoutSetProgressControllerProvider.notifier).clear,
+    clearConditioningProgress:
+        ref.read(workoutConditioningProgressControllerProvider.notifier).clear,
     readSetProgress: () => ref.read(workoutSetProgressControllerProvider),
   );
 });
@@ -54,17 +58,20 @@ class WorkoutCompletionController {
     required WorkoutRepository workoutRepository,
     required void Function() onWorkoutChanged,
     required void Function() clearSetProgress,
+    required void Function() clearConditioningProgress,
     required Map<String, WorkoutSetProgress> Function() readSetProgress,
     DateTime Function()? now,
   })  : _workoutRepository = workoutRepository,
         _onWorkoutChanged = onWorkoutChanged,
         _clearSetProgress = clearSetProgress,
+        _clearConditioningProgress = clearConditioningProgress,
         _readSetProgress = readSetProgress,
         _now = now ?? DateTime.now;
 
   final WorkoutRepository _workoutRepository;
   final void Function() _onWorkoutChanged;
   final void Function() _clearSetProgress;
+  final void Function() _clearConditioningProgress;
   final Map<String, WorkoutSetProgress> Function() _readSetProgress;
   final DateTime Function() _now;
   final Set<String> _finishingWorkoutIds = <String>{};
@@ -81,6 +88,7 @@ class WorkoutCompletionController {
     }
 
     _clearSetProgress();
+    _clearConditioningProgress();
     final Workout startedWorkout = currentWorkout.copyWith(
       status: WorkoutStatus.inProgress,
       startedAt: _now(),
@@ -98,7 +106,10 @@ class WorkoutCompletionController {
   /// Records entered sets, marks the workout complete, and persists it.
   ///
   /// Returns null when the workout is missing or was already completed.
-  Future<Workout?> finishWorkout(String workoutId) async {
+  Future<Workout?> finishWorkout(
+    String workoutId, {
+    ConditioningResult? conditioningResult,
+  }) async {
     if (!_finishingWorkoutIds.add(workoutId)) return null;
     try {
       final Workout? workout = await _workoutRepository.getById(workoutId);
@@ -122,6 +133,7 @@ class WorkoutCompletionController {
         startedAt: workout.startedAt ?? finishedAt,
         completedAt: finishedAt,
         sets: completedSets,
+        conditioningResult: conditioningResult,
       );
       await _workoutRepository.save(completedWorkout);
       final Workout? savedWorkout = await _workoutRepository.getById(workoutId);
@@ -130,7 +142,8 @@ class WorkoutCompletionController {
           savedWorkout.completedAt == null) {
         throw StateError('Unable to save the completed workout.');
       }
-      await _ensureRecommendedPlannedWorkout();
+      await _ensureRecommendedPlannedWorkout(workout.track);
+      _clearConditioningProgress();
       _onWorkoutChanged();
       return savedWorkout;
     } finally {
@@ -145,16 +158,21 @@ class WorkoutCompletionController {
     String workoutName, {
     bool replaceInProgress = false,
   }) async {
-    if (!WorkoutProgram.isProgramWorkoutName(workoutName)) {
+    final WorkoutTrack? track = WorkoutProgram.trackForWorkoutName(workoutName);
+    if (track == null) {
       throw ArgumentError.value(workoutName, 'workoutName');
     }
     final List<Workout> workouts = await _workoutRepository.getAll();
-    final Workout? activeWorkout = WorkoutProgram.nextIncompleteWorkout(
-      workouts
-          .where(
-              (Workout workout) => workout.status == WorkoutStatus.inProgress)
-          .toList(),
-    );
+    final List<Workout> activeWorkouts = workouts
+        .where((Workout workout) => workout.status == WorkoutStatus.inProgress)
+        .toList(growable: false)
+      ..sort((Workout first, Workout second) {
+        final DateTime firstDate = first.startedAt ?? first.scheduledDate;
+        final DateTime secondDate = second.startedAt ?? second.scheduledDate;
+        return secondDate.compareTo(firstDate);
+      });
+    final Workout? activeWorkout =
+        activeWorkouts.isEmpty ? null : activeWorkouts.first;
     if (activeWorkout != null && activeWorkout.name != workoutName) {
       if (!replaceInProgress) {
         throw WorkoutAlreadyInProgressException(activeWorkout);
@@ -173,7 +191,11 @@ class WorkoutCompletionController {
     final Workout? plannedWorkout =
         _plannedWorkoutByName(workouts, workoutName);
     final Workout? createdWorkout = plannedWorkout == null
-        ? _newPlannedWorkout(workouts: workouts, workoutName: workoutName)
+        ? _newPlannedWorkout(
+            workouts: workouts,
+            workoutName: workoutName,
+            track: track,
+          )
         : null;
     final Workout workoutToStart = plannedWorkout ??
         createdWorkout ??
@@ -187,20 +209,29 @@ class WorkoutCompletionController {
     final Workout? workout = await _workoutRepository.getById(workoutId);
     if (workout == null || workout.status != WorkoutStatus.completed) return;
     await _workoutRepository.delete(workoutId);
-    await _ensureRecommendedPlannedWorkout(fallbackTemplate: workout);
+    await _ensureRecommendedPlannedWorkout(
+      workout.track,
+      fallbackTemplate: workout,
+    );
     _onWorkoutChanged();
   }
 
-  Future<void> _ensureRecommendedPlannedWorkout({
+  Future<void> _ensureRecommendedPlannedWorkout(
+    WorkoutTrack track, {
     Workout? fallbackTemplate,
   }) async {
     final List<Workout> workouts = await _workoutRepository.getAll();
-    if (WorkoutProgram.nextIncompleteWorkout(workouts) != null) return;
-    final String workoutName =
-        WorkoutProgram.recommendedNextWorkoutName(workouts);
+    if (WorkoutProgram.nextIncompleteWorkout(workouts, track: track) != null) {
+      return;
+    }
+    final String workoutName = WorkoutProgram.recommendedNextWorkoutName(
+      workouts,
+      track: track,
+    );
     final Workout? plannedWorkout = _newPlannedWorkout(
       workouts: workouts,
       workoutName: workoutName,
+      track: track,
       fallbackTemplate: fallbackTemplate,
     );
     if (plannedWorkout == null) return;
@@ -210,9 +241,14 @@ class WorkoutCompletionController {
   Workout? _newPlannedWorkout({
     required List<Workout> workouts,
     required String workoutName,
+    required WorkoutTrack track,
     Workout? fallbackTemplate,
   }) {
-    final Workout? template = _templateWorkoutByName(workouts, workoutName) ??
+    final Workout? template = _templateWorkoutByName(
+          workouts,
+          workoutName,
+          track,
+        ) ??
         (fallbackTemplate?.name == workoutName ? fallbackTemplate : null);
     if (template == null) return null;
     final DateTime now = _now();
@@ -243,9 +279,16 @@ class WorkoutCompletionController {
     return candidates.isEmpty ? null : candidates.first;
   }
 
-  Workout? _templateWorkoutByName(List<Workout> workouts, String workoutName) {
+  Workout? _templateWorkoutByName(
+    List<Workout> workouts,
+    String workoutName,
+    WorkoutTrack track,
+  ) {
     final List<Workout> candidates = workouts
-        .where((Workout workout) => workout.name == workoutName)
+        .where(
+          (Workout workout) =>
+              workout.name == workoutName && workout.track == track,
+        )
         .toList(growable: false)
       ..sort((Workout first, Workout second) => first.id.compareTo(second.id));
     return candidates.isEmpty ? null : candidates.first;

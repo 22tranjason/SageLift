@@ -1,3 +1,4 @@
+import '../../domain/models/conditioning.dart';
 import '../../domain/models/exercise.dart';
 import '../../domain/models/workout.dart';
 import '../../domain/models/workout_set.dart';
@@ -5,7 +6,7 @@ import '../../domain/repositories/exercise_repository.dart';
 import '../../domain/repositories/workout_repository.dart';
 import '../../domain/services/workout_program.dart';
 
-/// Adds Jason's initial push, pull, legs programme to an empty local database.
+/// Adds Jason's PPL and CrossFit programmes without replacing local history.
 class WorkoutSeedService {
   /// Creates a seed service over the workout and exercise repositories.
   const WorkoutSeedService({
@@ -17,11 +18,11 @@ class WorkoutSeedService {
   final ExerciseRepository _exerciseRepository;
   final WorkoutRepository _workoutRepository;
 
-  /// Inserts the programme when the workout database is completely empty.
+  /// Inserts both programmes when the workout database is completely empty.
   ///
   /// Repeated calls never reseed or delete history. They safely upgrade planned
-  /// Push A sessions and reconcile one missing recommended planned session for
-  /// users whose older app version left only completed program records.
+  /// Push A sessions, adds the independent CrossFit seed to established PPL
+  /// databases, and reconciles one planned session for each programme.
   Future<void> seedIfEmpty() async {
     final List<Exercise> existingExercises = await _exerciseRepository.getAll();
     final List<Workout> existingWorkouts = await _workoutRepository.getAll();
@@ -30,14 +31,16 @@ class WorkoutSeedService {
         existingExercises: existingExercises,
         existingWorkouts: existingWorkouts,
       );
-      await _reconcileRecommendedPlannedWorkout();
+      await _seedMissingCrossFitData();
+      await _reconcileRecommendedPlannedWorkout(WorkoutTrack.strengthPpl);
+      await _reconcileRecommendedPlannedWorkout(WorkoutTrack.crossFit);
       return;
     }
 
-    for (final Exercise exercise in _exercises) {
+    for (final Exercise exercise in _allExercises) {
       await _exerciseRepository.save(exercise);
     }
-    for (final Workout workout in _workouts) {
+    for (final Workout workout in _allWorkouts) {
       await _workoutRepository.save(workout);
     }
   }
@@ -46,18 +49,21 @@ class WorkoutSeedService {
   ///
   /// It preserves completed history and existing planned sessions. A new session
   /// is created only when the recommended program name has no planned record.
-  Future<void> _reconcileRecommendedPlannedWorkout() async {
+  Future<void> _reconcileRecommendedPlannedWorkout(WorkoutTrack track) async {
     final List<Workout> workouts = await _workoutRepository.getAll();
     if (workouts.any(
       (Workout workout) => workout.status == WorkoutStatus.inProgress,
     )) {
       return;
     }
-    final String recommendedName =
-        WorkoutProgram.recommendedNextWorkoutName(workouts);
+    final String recommendedName = WorkoutProgram.recommendedNextWorkoutName(
+      workouts,
+      track: track,
+    );
     if (workouts.any(
       (Workout workout) =>
           workout.status == WorkoutStatus.planned &&
+          workout.track == track &&
           workout.name == recommendedName,
     )) {
       return;
@@ -78,6 +84,21 @@ class WorkoutSeedService {
         scheduledDate: DateTime(now.year, now.month, now.day),
       ),
     );
+  }
+
+  Future<void> _seedMissingCrossFitData() async {
+    final List<Exercise> exercises = await _exerciseRepository.getAll();
+    for (final Exercise exercise in _crossFitExercises) {
+      if (!exercises.any((Exercise existing) => existing.id == exercise.id)) {
+        await _exerciseRepository.save(exercise);
+      }
+    }
+    final List<Workout> workouts = await _workoutRepository.getAll();
+    for (final Workout workout in _crossFitWorkouts) {
+      if (!workouts.any((Workout existing) => existing.id == workout.id)) {
+        await _workoutRepository.save(workout);
+      }
+    }
   }
 
   Future<void> _upgradePlannedPushA({
@@ -330,6 +351,128 @@ class WorkoutSeedService {
     ),
   ];
 
+  static const List<Exercise> _crossFitExercises = <Exercise>[
+    Exercise(
+        id: 'crossfit-push-press',
+        name: 'Barbell Push Press',
+        category: ExerciseCategory.strength,
+        primaryMuscleGroup: MuscleGroup.shoulders,
+        equipment: Equipment.barbell),
+    Exercise(
+        id: 'crossfit-band-chest-to-bar',
+        name: 'Band-Assisted Chest-to-Bar Pull-up',
+        category: ExerciseCategory.strength,
+        primaryMuscleGroup: MuscleGroup.back,
+        equipment: Equipment.resistanceBand),
+    Exercise(
+        id: 'crossfit-step-ups',
+        name: 'Step-ups',
+        category: ExerciseCategory.conditioning,
+        primaryMuscleGroup: MuscleGroup.legs,
+        equipment: Equipment.bodyweight),
+    Exercise(
+        id: 'crossfit-db-clean-press',
+        name: 'Dumbbell Clean & Press',
+        category: ExerciseCategory.conditioning,
+        primaryMuscleGroup: MuscleGroup.fullBody,
+        equipment: Equipment.dumbbells),
+    Exercise(
+        id: 'crossfit-scaled-wall-walk',
+        name: 'Scaled Wall Walk',
+        category: ExerciseCategory.conditioning,
+        primaryMuscleGroup: MuscleGroup.shoulders,
+        equipment: Equipment.bodyweight),
+    Exercise(
+        id: 'crossfit-air-squat',
+        name: 'Air Squat',
+        category: ExerciseCategory.conditioning,
+        primaryMuscleGroup: MuscleGroup.legs,
+        equipment: Equipment.bodyweight),
+    Exercise(
+        id: 'crossfit-reverse-lunge',
+        name: 'Alternating Goblet Reverse Lunge',
+        category: ExerciseCategory.conditioning,
+        primaryMuscleGroup: MuscleGroup.legs,
+        equipment: Equipment.dumbbells),
+    Exercise(
+        id: 'crossfit-db-deadlift',
+        name: 'Dumbbell Deadlift',
+        category: ExerciseCategory.conditioning,
+        primaryMuscleGroup: MuscleGroup.legs,
+        equipment: Equipment.dumbbells),
+    Exercise(
+        id: 'crossfit-barbell-deadlift',
+        name: 'Barbell Deadlift',
+        category: ExerciseCategory.strength,
+        primaryMuscleGroup: MuscleGroup.legs,
+        equipment: Equipment.barbell),
+    Exercise(
+        id: 'crossfit-db-rdl',
+        name: 'Dumbbell Romanian Deadlift',
+        category: ExerciseCategory.conditioning,
+        primaryMuscleGroup: MuscleGroup.legs,
+        equipment: Equipment.dumbbells),
+    Exercise(
+        id: 'crossfit-push-up',
+        name: 'Push-up',
+        category: ExerciseCategory.conditioning,
+        primaryMuscleGroup: MuscleGroup.chest,
+        equipment: Equipment.bodyweight),
+    Exercise(
+        id: 'crossfit-band-pull-up',
+        name: 'Band-Assisted Pull-up',
+        category: ExerciseCategory.strength,
+        primaryMuscleGroup: MuscleGroup.back,
+        equipment: Equipment.resistanceBand),
+    Exercise(
+        id: 'crossfit-db-bench-press',
+        name: 'Dumbbell Bench Press',
+        category: ExerciseCategory.strength,
+        primaryMuscleGroup: MuscleGroup.chest,
+        equipment: Equipment.dumbbells),
+    Exercise(
+        id: 'crossfit-db-row',
+        name: 'Dumbbell Row',
+        category: ExerciseCategory.conditioning,
+        primaryMuscleGroup: MuscleGroup.back,
+        equipment: Equipment.dumbbells),
+    Exercise(
+        id: 'crossfit-db-goblet-squat',
+        name: 'Dumbbell Goblet Squat',
+        category: ExerciseCategory.conditioning,
+        primaryMuscleGroup: MuscleGroup.legs,
+        equipment: Equipment.dumbbells),
+    Exercise(
+        id: 'crossfit-db-clean',
+        name: 'Dumbbell Clean',
+        category: ExerciseCategory.strength,
+        primaryMuscleGroup: MuscleGroup.fullBody,
+        equipment: Equipment.dumbbells),
+    Exercise(
+        id: 'crossfit-goblet-squat',
+        name: 'Goblet Squat',
+        category: ExerciseCategory.strength,
+        primaryMuscleGroup: MuscleGroup.legs,
+        equipment: Equipment.dumbbells),
+    Exercise(
+        id: 'crossfit-db-push-press',
+        name: 'Dumbbell Push Press',
+        category: ExerciseCategory.conditioning,
+        primaryMuscleGroup: MuscleGroup.shoulders,
+        equipment: Equipment.dumbbells),
+    Exercise(
+        id: 'crossfit-sit-up',
+        name: 'Sit-up',
+        category: ExerciseCategory.conditioning,
+        primaryMuscleGroup: MuscleGroup.core,
+        equipment: Equipment.bodyweight),
+  ];
+
+  static const List<Exercise> _allExercises = <Exercise>[
+    ..._exercises,
+    ..._crossFitExercises,
+  ];
+
   static final List<Workout> _workouts = <Workout>[
     _workout(
       id: 'seed-workout-push-a',
@@ -520,6 +663,135 @@ class WorkoutSeedService {
     ),
   ];
 
+  static final List<Workout> _crossFitWorkouts = <Workout>[
+    _crossFitWorkout(
+      id: 'seed-workout-crossfit-a',
+      name: 'CrossFit A',
+      prescriptions: const <_ExercisePrescription>[
+        _ExercisePrescription(
+            exerciseId: 'crossfit-push-press',
+            targetReps: 5,
+            setCount: 5,
+            notes: '1-second overhead lockout'),
+        _ExercisePrescription(
+            exerciseId: 'crossfit-band-chest-to-bar',
+            targetReps: 8,
+            setCount: 5,
+            notes: 'Band-assisted; use a controlled chest-to-bar pull'),
+      ],
+      conditioningPlan: const ConditioningPlan(
+        format: ConditioningFormat.roundsForTime,
+        title: '4 rounds for time',
+        prescribedRounds: 4,
+        instructions:
+            '20 Step-ups\n200 m Run\n10 Dumbbell Clean & Press\n5 Scaled Wall Walks',
+      ),
+    ),
+    _crossFitWorkout(
+      id: 'seed-workout-crossfit-b',
+      name: 'CrossFit B',
+      warmUp:
+          '2 rounds:\n10 Air Squats\n8 Alternating Reverse Lunges\n10 Light Dumbbell Deadlifts\n20 sec Plank\nThen approximately 60 sec easy jog/walk',
+      prescriptions: const <_ExercisePrescription>[
+        _ExercisePrescription(
+            exerciseId: 'seed-exercise-barbell-back-squat',
+            targetReps: 5,
+            setCount: 5,
+            notes: 'Rest 90–120 sec'),
+      ],
+      conditioningPlan: const ConditioningPlan(
+        format: ConditioningFormat.roundsForTime,
+        title: '4 rounds for time',
+        prescribedRounds: 4,
+        instructions:
+            '12 Alternating Goblet Reverse Lunges (6 each leg)\n15 Dumbbell Deadlifts\n12 Step-ups (6 each leg)\n200 m Run\nScaling: replace step-ups with 15 Air Squats if no safe platform is available.',
+      ),
+    ),
+    _crossFitWorkout(
+      id: 'seed-workout-crossfit-c',
+      name: 'CrossFit C',
+      prescriptions: const <_ExercisePrescription>[
+        _ExercisePrescription(
+            exerciseId: 'crossfit-barbell-deadlift',
+            targetReps: 5,
+            setCount: 5,
+            notes: 'Strength: 5 × 5'),
+      ],
+      conditioningPlan: const ConditioningPlan(
+        format: ConditioningFormat.amrap,
+        title: '12-minute AMRAP',
+        durationMinutes: 12,
+        instructions:
+            '8 Dumbbell Romanian Deadlifts\n10 Push-ups\n12 Air Squats\n200 m Run\nScaling: elevated/incline push-ups are allowed.',
+      ),
+    ),
+    _crossFitWorkout(
+      id: 'seed-workout-crossfit-d',
+      name: 'CrossFit D',
+      prescriptions: const <_ExercisePrescription>[
+        _ExercisePrescription(
+            exerciseId: 'crossfit-band-pull-up',
+            targetReps: 7,
+            setCount: 5,
+            notes: 'Target 6–8 reps'),
+        _ExercisePrescription(
+            exerciseId: 'crossfit-db-bench-press',
+            targetReps: 8,
+            setCount: 4,
+            notes: 'Strength: 4 × 8'),
+      ],
+      conditioningPlan: const ConditioningPlan(
+        format: ConditioningFormat.roundsForTime,
+        title: '4 rounds for time',
+        prescribedRounds: 4,
+        instructions:
+            '10 Dumbbell Rows (5 each side)\n10 Push-ups\n12 Dumbbell Goblet Squats\n200 m Run',
+      ),
+    ),
+    _crossFitWorkout(
+      id: 'seed-workout-crossfit-e',
+      name: 'CrossFit E',
+      prescriptions: const <_ExercisePrescription>[
+        _ExercisePrescription(
+            exerciseId: 'crossfit-db-clean',
+            targetReps: 5,
+            setCount: 5,
+            notes:
+                '5 each side; keep load deliberately light and technique-focused.'),
+      ],
+      conditioningPlan: const ConditioningPlan(
+        format: ConditioningFormat.emom,
+        title: '15-minute EMOM',
+        durationMinutes: 15,
+        instructions:
+            'Minute 1: 10 Dumbbell Goblet Squats\nMinute 2: 8 Dumbbell Clean & Press (4 each side)\nMinute 3: 40 sec brisk run / shuttle / fast walk\nRepeat for 5 cycles.',
+      ),
+    ),
+    _crossFitWorkout(
+      id: 'seed-workout-crossfit-f',
+      name: 'CrossFit F',
+      prescriptions: const <_ExercisePrescription>[
+        _ExercisePrescription(
+            exerciseId: 'crossfit-goblet-squat',
+            targetReps: 10,
+            setCount: 4,
+            notes: 'Strength: 4 × 10'),
+      ],
+      conditioningPlan: const ConditioningPlan(
+        format: ConditioningFormat.amrap,
+        title: '20-minute AMRAP',
+        durationMinutes: 20,
+        instructions:
+            '200 m Run\n10 Dumbbell Deadlifts\n10 Step-ups\n8 Dumbbell Push Press\n10 Sit-ups\nScaling: replace step-ups with 15 Air Squats if no safe platform is available.',
+      ),
+    ),
+  ];
+
+  static final List<Workout> _allWorkouts = <Workout>[
+    ..._workouts,
+    ..._crossFitWorkouts,
+  ];
+
   static const _ExercisePrescription _pushAExtension = _ExercisePrescription(
     exerciseId: 'seed-exercise-overhead-rope-triceps-extension',
     targetReps: 15,
@@ -554,6 +826,25 @@ class WorkoutSeedService {
               notes: prescription.notes,
             ),
       ],
+    );
+  }
+
+  static Workout _crossFitWorkout({
+    required String id,
+    required String name,
+    required List<_ExercisePrescription> prescriptions,
+    required ConditioningPlan conditioningPlan,
+    String? warmUp,
+  }) {
+    final Workout baseWorkout = _workout(
+      id: id,
+      name: name,
+      prescriptions: prescriptions,
+    );
+    return baseWorkout.copyWith(
+      track: WorkoutTrack.crossFit,
+      warmUp: warmUp,
+      conditioningPlan: conditioningPlan,
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/app_router.dart';
+import '../../domain/models/conditioning.dart';
 import '../../domain/models/workout.dart';
 import '../providers/workout_completion_controller.dart';
 import '../providers/workout_history_provider.dart';
@@ -77,6 +78,17 @@ class WorkoutDetailsScreen extends ConsumerWidget {
                     label: 'Total volume',
                     value: '${summary.totalVolumeKg.toStringAsFixed(0)} kg',
                   ),
+                  if (summary.workout.conditioningResult != null) ...<Widget>[
+                    const SizedBox(height: 16),
+                    Text(
+                      'Conditioning',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    _ConditioningDetail(
+                      result: summary.workout.conditioningResult!,
+                      plan: summary.workout.conditioningPlan,
+                    ),
+                  ],
                   const SizedBox(height: 24),
                   Text(
                     'Completed exercises',
@@ -193,6 +205,39 @@ class WorkoutDetailsScreen extends ConsumerWidget {
         const SnackBar(content: Text('Unable to delete workout.')),
       );
     }
+  }
+}
+
+class _ConditioningDetail extends StatelessWidget {
+  const _ConditioningDetail({required this.result, required this.plan});
+
+  final ConditioningResult result;
+  final ConditioningPlan? plan;
+
+  @override
+  Widget build(BuildContext context) {
+    final String extra =
+        result.additionalReps == 0 ? '' : ' + ${result.additionalReps} reps';
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            if (plan?.prescribedRounds != null)
+              Text('Target: ${plan!.prescribedRounds} rounds'),
+            Text('Result: ${result.roundsCompleted} rounds$extra'),
+            if (result.completionTime != null)
+              Text('Time: ${result.completionTime!.inMinutes}:'
+                  '${(result.completionTime!.inSeconds % 60).toString().padLeft(2, '0')}'),
+            if (result.weightKg != null)
+              Text('Weight: ${result.weightKg!.toStringAsFixed(0)} kg'),
+            if (result.scaling != null) Text('Scaling: ${result.scaling}'),
+            Text(result.isCompleted ? 'Completed' : 'Not completed'),
+          ],
+        ),
+      ),
+    );
   }
 }
 

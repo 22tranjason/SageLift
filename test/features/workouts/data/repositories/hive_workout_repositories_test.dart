@@ -7,6 +7,7 @@ import 'package:sagelift/features/workouts/data/local/workout_hive_store.dart';
 import 'package:sagelift/features/workouts/data/repositories/hive_exercise_repository.dart';
 import 'package:sagelift/features/workouts/data/repositories/hive_workout_repository.dart';
 import 'package:sagelift/features/workouts/data/services/workout_seed_service.dart';
+import 'package:sagelift/features/workouts/domain/models/conditioning.dart';
 import 'package:sagelift/features/workouts/domain/models/exercise.dart';
 import 'package:sagelift/features/workouts/domain/models/workout.dart';
 import 'package:sagelift/features/workouts/domain/models/workout_set.dart';
@@ -43,8 +44,20 @@ void main() {
     final List<Exercise> exercises = await exerciseRepository.getAll();
     final List<Workout> workouts = await workoutRepository.getAll();
 
-    expect(exercises, hasLength(29));
-    expect(workouts, hasLength(6));
+    expect(exercises, hasLength(48));
+    expect(workouts, hasLength(12));
+    expect(
+      workouts
+          .where((Workout workout) => workout.track == WorkoutTrack.crossFit),
+      hasLength(6),
+    );
+    expect(
+      workouts
+          .singleWhere((Workout workout) => workout.name == 'CrossFit A')
+          .conditioningPlan
+          ?.prescribedRounds,
+      4,
+    );
     expect(
       exercises.map((Exercise exercise) => exercise.name),
       isNot(contains('Machine Chest Press')),
@@ -113,7 +126,7 @@ void main() {
       workoutRepository: workoutRepository,
     ).seedIfEmpty();
 
-    expect(await workoutRepository.getAll(), hasLength(6));
+    expect(await workoutRepository.getAll(), hasLength(12));
 
     const Exercise exercise = Exercise(
       id: 'exercise-1',
@@ -194,6 +207,39 @@ void main() {
       await reopenedRepository.getById(completedWorkout.id),
       completedWorkout,
     );
+  });
+
+  test('persists incomplete CrossFit conditioning results', () async {
+    final WorkoutHiveStore store = await WorkoutHiveStore.open();
+    final HiveWorkoutRepository repository = HiveWorkoutRepository(
+      store.workoutBox,
+    );
+    final Workout workout = Workout(
+      id: 'crossfit-result',
+      name: 'CrossFit A',
+      scheduledDate: DateTime.utc(2026, 8, 8),
+      status: WorkoutStatus.completed,
+      track: WorkoutTrack.crossFit,
+      completedAt: DateTime.utc(2026, 8, 8, 7),
+      conditioningPlan: const ConditioningPlan(
+        format: ConditioningFormat.roundsForTime,
+        title: '4 rounds for time',
+        instructions: 'Test movements',
+        prescribedRounds: 4,
+      ),
+      conditioningResult: const ConditioningResult(
+        roundsCompleted: 3,
+        additionalReps: 12,
+        completionTime: Duration(minutes: 18, seconds: 42),
+        weightKg: 10,
+        scaling: 'Step-ups and band-assisted pull-ups',
+        isCompleted: false,
+      ),
+    );
+
+    await repository.save(workout);
+
+    expect(await repository.getById(workout.id), workout);
   });
 }
 

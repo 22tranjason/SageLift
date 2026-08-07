@@ -3,12 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/app_router.dart';
+import '../../domain/models/conditioning.dart';
 import '../../domain/models/exercise.dart';
 import '../../domain/models/workout.dart';
 import '../../domain/models/workout_set.dart';
 import '../../domain/services/exercise_progression_service.dart';
 import '../providers/today_workout_provider.dart';
 import '../providers/workout_completion_controller.dart';
+import '../providers/workout_conditioning_progress_controller.dart';
 import '../providers/workout_history_provider.dart';
 import '../providers/workout_progression_provider.dart';
 import '../providers/workout_set_progress_controller.dart';
@@ -16,7 +18,14 @@ import '../providers/workout_set_progress_controller.dart';
 /// Focused set-entry screen for one exercise in the selected workout.
 class ExerciseScreen extends ConsumerWidget {
   /// Creates an exercise screen for [exerciseIndex] in workout order.
-  const ExerciseScreen({required this.exerciseIndex, super.key});
+  const ExerciseScreen({
+    required this.workoutId,
+    required this.exerciseIndex,
+    super.key,
+  });
+
+  /// Stable identifier of the selected PPL or CrossFit workout session.
+  final String workoutId;
 
   /// Zero-based position of the focused exercise in the workout.
   final int exerciseIndex;
@@ -24,7 +33,7 @@ class ExerciseScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final AsyncValue<TodayWorkout?> todayWorkout = ref.watch(
-      todayWorkoutProvider,
+      workoutSessionProvider(workoutId),
     );
 
     return Scaffold(
@@ -50,9 +59,10 @@ class ExerciseScreen extends ConsumerWidget {
               sets: sets,
               exerciseIndex: exerciseIndex,
               exerciseCount: workoutData.exercises.length,
-              workoutId: workoutData.workout.id,
+              workoutId: workoutId,
               workoutIsCompleted:
                   workoutData.workout.status == WorkoutStatus.completed,
+              conditioningPlan: workoutData.workout.conditioningPlan,
             );
           },
         ),
@@ -69,6 +79,7 @@ class _ExerciseContent extends ConsumerWidget {
     required this.exerciseCount,
     required this.workoutId,
     required this.workoutIsCompleted,
+    required this.conditioningPlan,
   });
 
   final Exercise exercise;
@@ -77,6 +88,7 @@ class _ExerciseContent extends ConsumerWidget {
   final int exerciseCount;
   final String workoutId;
   final bool workoutIsCompleted;
+  final ConditioningPlan? conditioningPlan;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -156,6 +168,13 @@ class _ExerciseContent extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
           ],
+          if (exerciseIndex == exerciseCount - 1 && conditioningPlan != null)
+            _ConditioningEntryCard(
+              workoutId: workoutId,
+              plan: conditioningPlan!,
+            ),
+          if (exerciseIndex == exerciseCount - 1 && conditioningPlan != null)
+            const SizedBox(height: 12),
           const SizedBox(height: 8),
           Row(
             children: <Widget>[
@@ -191,7 +210,10 @@ class _ExerciseContent extends ConsumerWidget {
                   try {
                     final Workout? completedWorkout = await ref
                         .read(workoutCompletionControllerProvider)
-                        .finishWorkout(workoutId);
+                        .finishWorkout(
+                          workoutId,
+                          conditioningResult: _conditioningResult(ref),
+                        );
                     if (!context.mounted || completedWorkout == null) return;
                     context.goNamed(
                       AppRoute.workoutSummary.name,
@@ -228,7 +250,152 @@ class _ExerciseContent extends ConsumerWidget {
   void _replaceExercise(BuildContext context, int index) {
     context.pushReplacementNamed(
       AppRoute.exercise.name,
-      pathParameters: <String, String>{'index': '$index'},
+      pathParameters: <String, String>{
+        'id': workoutId,
+        'index': '$index',
+      },
+    );
+  }
+
+  ConditioningResult? _conditioningResult(WidgetRef ref) {
+    if (conditioningPlan == null) return null;
+    final WorkoutConditioningProgress progress = ref.read(
+          workoutConditioningProgressControllerProvider,
+        )[workoutId] ??
+        const WorkoutConditioningProgress();
+    final int minutes = int.tryParse(progress.minutes) ?? 0;
+    final int seconds = int.tryParse(progress.seconds) ?? 0;
+    final Duration? completionTime = minutes == 0 && seconds == 0
+        ? null
+        : Duration(minutes: minutes, seconds: seconds);
+    return ConditioningResult(
+      roundsCompleted: int.tryParse(progress.rounds) ?? 0,
+      additionalReps: int.tryParse(progress.additionalReps) ?? 0,
+      completionTime: completionTime,
+      weightKg: double.tryParse(progress.weight),
+      scaling: progress.scaling.trim().isEmpty ? null : progress.scaling.trim(),
+      isCompleted: progress.isCompleted,
+    );
+  }
+}
+
+class _ConditioningEntryCard extends ConsumerWidget {
+  const _ConditioningEntryCard({required this.workoutId, required this.plan});
+
+  final String workoutId;
+  final ConditioningPlan plan;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final WorkoutConditioningProgress progress = ref.watch(
+          workoutConditioningProgressControllerProvider,
+        )[workoutId] ??
+        const WorkoutConditioningProgress();
+    final WorkoutConditioningProgressController controller = ref.read(
+      workoutConditioningProgressControllerProvider.notifier,
+    );
+    void update(WorkoutConditioningProgress value) =>
+        controller.update(workoutId, value);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text('Conditioning',
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 4),
+            Text(plan.title),
+            const SizedBox(height: 4),
+            Text(plan.instructions,
+                style: Theme.of(context).textTheme.bodySmall),
+            const SizedBox(height: 12),
+            if (plan.prescribedRounds != null)
+              Text('Target: ${plan.prescribedRounds} rounds'),
+            Row(
+              children: <Widget>[
+                Expanded(
+                    child: _ConditioningField(
+                        label: 'Rounds',
+                        value: progress.rounds,
+                        onChanged: (String value) =>
+                            update(progress.copyWith(rounds: value)))),
+                const SizedBox(width: 8),
+                Expanded(
+                    child: _ConditioningField(
+                        label: 'Extra reps',
+                        value: progress.additionalReps,
+                        onChanged: (String value) =>
+                            update(progress.copyWith(additionalReps: value)))),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: <Widget>[
+                Expanded(
+                    child: _ConditioningField(
+                        label: 'Minutes',
+                        value: progress.minutes,
+                        onChanged: (String value) =>
+                            update(progress.copyWith(minutes: value)))),
+                const SizedBox(width: 8),
+                Expanded(
+                    child: _ConditioningField(
+                        label: 'Seconds',
+                        value: progress.seconds,
+                        onChanged: (String value) =>
+                            update(progress.copyWith(seconds: value)))),
+                const SizedBox(width: 8),
+                Expanded(
+                    child: _ConditioningField(
+                        label: 'Weight kg',
+                        value: progress.weight,
+                        decimal: true,
+                        onChanged: (String value) =>
+                            update(progress.copyWith(weight: value)))),
+              ],
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              initialValue: progress.scaling,
+              decoration: const InputDecoration(
+                  labelText: 'Scaling or modification', isDense: true),
+              onChanged: (String value) =>
+                  update(progress.copyWith(scaling: value)),
+            ),
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Conditioning completed'),
+              value: progress.isCompleted,
+              onChanged: (bool? value) =>
+                  update(progress.copyWith(isCompleted: value ?? false)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ConditioningField extends StatelessWidget {
+  const _ConditioningField(
+      {required this.label,
+      required this.value,
+      required this.onChanged,
+      this.decimal = false});
+
+  final String label;
+  final String value;
+  final ValueChanged<String> onChanged;
+  final bool decimal;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextFormField(
+      initialValue: value,
+      keyboardType: TextInputType.numberWithOptions(decimal: decimal),
+      decoration: InputDecoration(labelText: label, isDense: true),
+      onChanged: onChanged,
     );
   }
 }

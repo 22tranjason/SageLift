@@ -22,6 +22,9 @@ class TodayScreen extends ConsumerWidget {
     final AsyncValue<TodayWorkout?> todayWorkout = ref.watch(
       todayWorkoutProvider,
     );
+    final AsyncValue<TodayWorkout?> crossFitWorkout = ref.watch(
+      crossFitTodayWorkoutProvider,
+    );
     final AsyncValue<Workout?> lastCompletedWorkout = ref.watch(
       lastCompletedWorkoutProvider,
     );
@@ -122,6 +125,9 @@ class TodayScreen extends ConsumerWidget {
                               unawaited(
                                 context.pushNamed(
                                   AppRoute.workoutOverview.name,
+                                  pathParameters: <String, String>{
+                                    'id': startedWorkout.id,
+                                  },
                                 ),
                               );
                             } catch (_) {
@@ -145,6 +151,67 @@ class TodayScreen extends ConsumerWidget {
                   );
                 },
               ),
+              const SizedBox(height: 24),
+              Text('CrossFit', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 8),
+              crossFitWorkout.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (Object error, StackTrace stackTrace) {
+                  return const Text(
+                      'Unable to load the next CrossFit workout.');
+                },
+                data: (TodayWorkout? workoutData) {
+                  if (workoutData == null) {
+                    return const Text('No CrossFit workout is available yet.');
+                  }
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        'Next: ${workoutData.workout.name}',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.tonal(
+                          key: const ValueKey<String>('start-crossfit-button'),
+                          onPressed: () async {
+                            try {
+                              final Workout? startedWorkout = await ref
+                                  .read(workoutCompletionControllerProvider)
+                                  .startWorkout(workoutData.workout);
+                              if (!context.mounted || startedWorkout == null) {
+                                return;
+                              }
+                              await context.pushNamed(
+                                AppRoute.workoutOverview.name,
+                                pathParameters: <String, String>{
+                                  'id': startedWorkout.id,
+                                },
+                              );
+                            } catch (_) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text(
+                                        'Unable to start CrossFit workout.')),
+                              );
+                            }
+                          },
+                          child: Text(
+                            workoutData.workout.status ==
+                                    WorkoutStatus.inProgress
+                                ? 'Resume CrossFit'
+                                : 'Start CrossFit',
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 24),
               lastCompletedWorkout.when(
                 loading: () => const SizedBox.shrink(),
                 error: (Object error, StackTrace stackTrace) {
@@ -198,7 +265,14 @@ class TodayScreen extends ConsumerWidget {
             shrinkWrap: true,
             children: <Widget>[
               const ListTile(title: Text('Choose Workout')),
+              const ListTile(title: Text('Strength — PPL')),
               for (final String name in WorkoutProgram.workoutNames)
+                ListTile(
+                  title: Text(name),
+                  onTap: () => Navigator.of(sheetContext).pop(name),
+                ),
+              const ListTile(title: Text('CrossFit')),
+              for (final String name in WorkoutProgram.crossFitWorkoutNames)
                 ListTile(
                   title: Text(name),
                   onTap: () => Navigator.of(sheetContext).pop(name),
@@ -225,8 +299,13 @@ class TodayScreen extends ConsumerWidget {
             workoutName,
             replaceInProgress: replaceInProgress,
           );
-      if (!context.mounted || startedWorkout == null) return;
-      await context.pushNamed(AppRoute.workoutOverview.name);
+      if (!context.mounted || startedWorkout == null) {
+        return;
+      }
+      await context.pushNamed(
+        AppRoute.workoutOverview.name,
+        pathParameters: <String, String>{'id': startedWorkout.id},
+      );
     } on WorkoutAlreadyInProgressException catch (error) {
       if (!context.mounted) return;
       final bool confirmed = await _confirmReplaceInProgress(

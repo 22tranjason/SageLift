@@ -46,7 +46,7 @@ final FutureProviderFamily<ExerciseProgressionGuidance?,
     final Workout? workout = await workoutRepository.getById(
       request.workoutId,
     );
-    if (workout == null) return null;
+    if (workout == null || workout.track == WorkoutTrack.crossFit) return null;
 
     final List<WorkoutSet> programmedSets = _setsForExercise(
       workout,
@@ -80,6 +80,9 @@ final FutureProviderFamily<List<WorkoutExerciseProgression>, String>
     );
     final Workout? workout = await workoutRepository.getById(workoutId);
     if (workout == null || workout.status != WorkoutStatus.completed) {
+      return const <WorkoutExerciseProgression>[];
+    }
+    if (workout.track == WorkoutTrack.crossFit) {
       return const <WorkoutExerciseProgression>[];
     }
 

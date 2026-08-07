@@ -99,13 +99,26 @@ class WorkoutHiveModelAdapter extends TypeAdapter<WorkoutHiveModel> {
       startedAtMilliseconds: fields[6] as int?,
       completedAtMilliseconds: fields[7] as int?,
       notes: fields[8] as String?,
+      trackIndex: fields[9] as int? ?? 0,
+      warmUp: fields[10] as String?,
+      conditioningFormatIndex: fields[11] as int?,
+      conditioningTitle: fields[12] as String?,
+      conditioningInstructions: fields[13] as String?,
+      prescribedRounds: fields[14] as int?,
+      conditioningDurationMinutes: fields[15] as int?,
+      roundsCompleted: fields[16] as int?,
+      additionalReps: fields[17] as int?,
+      completionTimeMilliseconds: fields[18] as int?,
+      conditioningWeightKg: fields[19] as double?,
+      conditioningScaling: fields[20] as String?,
+      conditioningCompleted: fields[21] as bool?,
     );
   }
 
   @override
   void write(BinaryWriter writer, WorkoutHiveModel object) {
     writer
-      ..writeByte(9)
+      ..writeByte(22)
       ..writeByte(0)
       ..write(object.id)
       ..writeByte(1)
@@ -123,7 +136,33 @@ class WorkoutHiveModelAdapter extends TypeAdapter<WorkoutHiveModel> {
       ..writeByte(7)
       ..write(object.completedAtMilliseconds)
       ..writeByte(8)
-      ..write(object.notes);
+      ..write(object.notes)
+      ..writeByte(9)
+      ..write(object.trackIndex)
+      ..writeByte(10)
+      ..write(object.warmUp)
+      ..writeByte(11)
+      ..write(object.conditioningFormatIndex)
+      ..writeByte(12)
+      ..write(object.conditioningTitle)
+      ..writeByte(13)
+      ..write(object.conditioningInstructions)
+      ..writeByte(14)
+      ..write(object.prescribedRounds)
+      ..writeByte(15)
+      ..write(object.conditioningDurationMinutes)
+      ..writeByte(16)
+      ..write(object.roundsCompleted)
+      ..writeByte(17)
+      ..write(object.additionalReps)
+      ..writeByte(18)
+      ..write(object.completionTimeMilliseconds)
+      ..writeByte(19)
+      ..write(object.conditioningWeightKg)
+      ..writeByte(20)
+      ..write(object.conditioningScaling)
+      ..writeByte(21)
+      ..write(object.conditioningCompleted);
   }
 }
 
