@@ -42,6 +42,7 @@ class Workout {
     this.warmUp,
     this.conditioningPlan,
     this.conditioningResult,
+    this.sessionDurationTarget,
   })  : _exerciseIds = List<String>.unmodifiable(exerciseIds),
         _sets = List<WorkoutSet>.unmodifiable(sets);
 
@@ -86,6 +87,9 @@ class Workout {
   /// Optional factual conditioning result recorded when the workout finishes.
   final ConditioningResult? conditioningResult;
 
+  /// Informational session-duration target, used by CrossFit seed workouts.
+  final String? sessionDurationTarget;
+
   static const Object _unset = Object();
 
   /// Returns this workout with selected values replaced.
@@ -106,6 +110,7 @@ class Workout {
     Object? warmUp = _unset,
     Object? conditioningPlan = _unset,
     Object? conditioningResult = _unset,
+    Object? sessionDurationTarget = _unset,
   }) {
     return Workout(
       id: id ?? this.id,
@@ -129,6 +134,9 @@ class Workout {
       conditioningResult: identical(conditioningResult, _unset)
           ? this.conditioningResult
           : conditioningResult as ConditioningResult?,
+      sessionDurationTarget: identical(sessionDurationTarget, _unset)
+          ? this.sessionDurationTarget
+          : sessionDurationTarget as String?,
     );
   }
 
@@ -147,7 +155,8 @@ class Workout {
         other.track == track &&
         other.warmUp == warmUp &&
         other.conditioningPlan == conditioningPlan &&
-        other.conditioningResult == conditioningResult;
+        other.conditioningResult == conditioningResult &&
+        other.sessionDurationTarget == sessionDurationTarget;
   }
 
   @override
@@ -165,6 +174,7 @@ class Workout {
         warmUp,
         conditioningPlan,
         conditioningResult,
+        sessionDurationTarget,
       );
 }
 

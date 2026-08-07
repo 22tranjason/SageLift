@@ -26,6 +26,9 @@ class WorkoutHiveModel {
     this.conditioningWeightKg,
     this.conditioningScaling,
     this.conditioningCompleted,
+    this.sessionDurationTarget,
+    this.conditioningMovementsJson,
+    this.conditioningMovementResultsJson,
   })  : exerciseIds = List<String>.unmodifiable(exerciseIds),
         sets = List<WorkoutSetHiveModel>.unmodifiable(sets);
 
@@ -94,4 +97,13 @@ class WorkoutHiveModel {
 
   /// Whether the prescribed conditioning work was completed.
   final bool? conditioningCompleted;
+
+  /// Optional informational duration target for a CrossFit session.
+  final String? sessionDurationTarget;
+
+  /// JSON-encoded ordered conditioning-movement prescriptions.
+  final String? conditioningMovementsJson;
+
+  /// JSON-encoded movement-specific conditioning results.
+  final String? conditioningMovementResultsJson;
 }

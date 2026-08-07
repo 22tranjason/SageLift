@@ -42,6 +42,12 @@ class WorkoutOverviewScreen extends ConsumerWidget {
                       workoutData.workout.name,
                       style: Theme.of(context).textTheme.headlineSmall,
                     ),
+                    if (workoutData.workout.sessionDurationTarget != null)
+                      Text(
+                        'Target session duration: '
+                        '${workoutData.workout.sessionDurationTarget}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
                     const SizedBox(height: 16),
                     WorkoutExerciseList(
                       exercises: workoutData.exercises,

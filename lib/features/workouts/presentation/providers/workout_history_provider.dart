@@ -111,6 +111,30 @@ final FutureProviderFamily<PreviousExercisePerformance?, String>
   },
 );
 
+/// Loads the latest completed conditioning result for the same CrossFit workout.
+final FutureProviderFamily<Workout?, String>
+    previousCrossFitConditioningProvider =
+    FutureProvider.family<Workout?, String>(
+  (Ref ref, String workoutId) async {
+    ref.watch(workoutDataRevisionProvider);
+    final WorkoutRepository repository = ref.watch(workoutRepositoryProvider);
+    final Workout? current = await repository.getById(workoutId);
+    if (current == null || current.track != WorkoutTrack.crossFit) return null;
+    final List<Workout> candidates = (await repository.getAll())
+        .where(
+          (Workout workout) =>
+              workout.id != workoutId &&
+              workout.track == WorkoutTrack.crossFit &&
+              workout.name == current.name &&
+              workout.status == WorkoutStatus.completed &&
+              workout.conditioningResult != null,
+        )
+        .toList(growable: false)
+      ..sort(_compareByCompletionDateDescending);
+    return candidates.isEmpty ? null : candidates.first;
+  },
+);
+
 /// A completed workout and its calculated history-list statistics.
 class WorkoutHistoryItem {
   /// Creates an item representing one persisted completed workout.

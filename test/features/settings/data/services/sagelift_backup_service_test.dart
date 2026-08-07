@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -100,6 +101,32 @@ void main() {
     expect(checkInBox.get('check-in-1')?.waterMillilitres, 2500);
     expect(checkInBox.get('check-in-1')?.completedHabitIds, <String>['walk']);
     expect(habitBox.get('habit-1')?.name, 'Walk');
+  });
+
+  test('older backups without movement-specific fields remain restorable',
+      () async {
+    await _seed(exerciseBox, workoutBox, checkInBox, habitBox, settingsBox);
+    final SageLiftBackupService service = _service(
+      exerciseBox,
+      workoutBox,
+      checkInBox,
+      habitBox,
+      settingsBox,
+    );
+    final Map<String, dynamic> document =
+        jsonDecode(service.createBackup().contents) as Map<String, dynamic>;
+    final Map<String, dynamic> workout =
+        (document['workouts'] as List<dynamic>).single as Map<String, dynamic>;
+    workout
+      ..remove('sessionDurationTarget')
+      ..remove('conditioningMovementsJson')
+      ..remove('conditioningMovementResultsJson');
+
+    await workoutBox.clear();
+    await service.restore(jsonEncode(document));
+
+    expect(workoutBox.get('workout-1')?.trackIndex, 0);
+    expect(workoutBox.get('workout-1')?.conditioningMovementsJson, isNull);
   });
 }
 

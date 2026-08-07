@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -207,6 +209,14 @@ class _ExerciseContent extends ConsumerWidget {
               child: FilledButton(
                 key: const ValueKey<String>('finish-workout-button'),
                 onPressed: () async {
+                  final WorkoutConditioningProgress conditioningProgress =
+                      ref.read(workoutConditioningProgressControllerProvider)[
+                              workoutId] ??
+                          WorkoutConditioningProgress();
+                  if (conditioningProgress.timer.isRunning &&
+                      !await _confirmFinishWhileTimerRuns(context)) {
+                    return;
+                  }
                   try {
                     final Workout? completedWorkout = await ref
                         .read(workoutCompletionControllerProvider)
@@ -262,7 +272,7 @@ class _ExerciseContent extends ConsumerWidget {
     final WorkoutConditioningProgress progress = ref.read(
           workoutConditioningProgressControllerProvider,
         )[workoutId] ??
-        const WorkoutConditioningProgress();
+        WorkoutConditioningProgress();
     final int minutes = int.tryParse(progress.minutes) ?? 0;
     final int seconds = int.tryParse(progress.seconds) ?? 0;
     final Duration? completionTime = minutes == 0 && seconds == 0
@@ -272,30 +282,98 @@ class _ExerciseContent extends ConsumerWidget {
       roundsCompleted: int.tryParse(progress.rounds) ?? 0,
       additionalReps: int.tryParse(progress.additionalReps) ?? 0,
       completionTime: completionTime,
-      weightKg: double.tryParse(progress.weight),
+      movementResults: <ConditioningMovementResult>[
+        for (final ConditioningMovement movement in conditioningPlan!.movements)
+          ConditioningMovementResult(
+            movementId: movement.id,
+            actualLoad:
+                double.tryParse(progress.movements[movement.id]?.load ?? ''),
+            implementCount: int.tryParse(
+              progress.movements[movement.id]?.implementCount ?? '',
+            ),
+            modification: (progress.movements[movement.id]?.modification ?? '')
+                    .trim()
+                    .isEmpty
+                ? null
+                : progress.movements[movement.id]!.modification.trim(),
+          ),
+      ],
       scaling: progress.scaling.trim().isEmpty ? null : progress.scaling.trim(),
       isCompleted: progress.isCompleted,
     );
   }
+
+  Future<bool> _confirmFinishWhileTimerRuns(BuildContext context) async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (BuildContext dialogContext) => AlertDialog(
+            title: const Text('Conditioning is still active'),
+            content: const Text(
+              'Finish Conditioning before finishing the workout, or confirm '
+              'that you want to finish the workout now.',
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('Keep logging'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('Finish workout'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
 }
 
-class _ConditioningEntryCard extends ConsumerWidget {
+class _ConditioningEntryCard extends ConsumerStatefulWidget {
   const _ConditioningEntryCard({required this.workoutId, required this.plan});
 
   final String workoutId;
   final ConditioningPlan plan;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ConditioningEntryCard> createState() =>
+      _ConditioningEntryCardState();
+}
+
+class _ConditioningEntryCardState
+    extends ConsumerState<_ConditioningEntryCard> {
+  Timer? _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final WorkoutConditioningProgress progress = ref.watch(
           workoutConditioningProgressControllerProvider,
-        )[workoutId] ??
-        const WorkoutConditioningProgress();
+        )[widget.workoutId] ??
+        WorkoutConditioningProgress();
     final WorkoutConditioningProgressController controller = ref.read(
       workoutConditioningProgressControllerProvider.notifier,
     );
     void update(WorkoutConditioningProgress value) =>
-        controller.update(workoutId, value);
+        controller.update(widget.workoutId, value);
+    final bool isForTime =
+        widget.plan.format == ConditioningFormat.roundsForTime;
+    final Duration elapsed = progress.timer.elapsedAt(DateTime.now());
+    final AsyncValue<Workout?> previous = ref.watch(
+      previousCrossFitConditioningProvider(widget.workoutId),
+    );
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -305,13 +383,78 @@ class _ConditioningEntryCard extends ConsumerWidget {
             Text('Conditioning',
                 style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 4),
-            Text(plan.title),
+            Text(widget.plan.title),
             const SizedBox(height: 4),
-            Text(plan.instructions,
+            Text(widget.plan.instructions,
                 style: Theme.of(context).textTheme.bodySmall),
             const SizedBox(height: 12),
-            if (plan.prescribedRounds != null)
-              Text('Target: ${plan.prescribedRounds} rounds'),
+            previous.when(
+              loading: () => const SizedBox.shrink(),
+              error: (Object error, StackTrace stackTrace) =>
+                  const SizedBox.shrink(),
+              data: (Workout? workout) => workout == null
+                  ? const SizedBox.shrink()
+                  : _PreviousConditioningCard(
+                      workout: workout,
+                      plan: widget.plan,
+                    ),
+            ),
+            if (isForTime) ...<Widget>[
+              Center(
+                child: Text(
+                  _durationLabel(elapsed),
+                  style: Theme.of(context).textTheme.displayMedium,
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () {
+                    if (progress.timer.isRunning) {
+                      controller.pauseTimer(widget.workoutId, DateTime.now());
+                    } else if (progress.timer.elapsed == Duration.zero) {
+                      controller.startTimer(widget.workoutId, DateTime.now());
+                    } else {
+                      controller.startTimer(widget.workoutId, DateTime.now());
+                    }
+                  },
+                  child: Text(progress.timer.isRunning
+                      ? 'Pause'
+                      : progress.timer.elapsed == Duration.zero
+                          ? 'Start Conditioning'
+                          : 'Resume'),
+                ),
+              ),
+              if (progress.timer.isRunning ||
+                  progress.timer.elapsed > Duration.zero)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: () => controller.finishTimer(
+                        widget.workoutId,
+                        DateTime.now(),
+                      ),
+                      child: const Text('Finish Conditioning'),
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 12),
+            ],
+            if (widget.plan.prescribedRounds != null)
+              Text('Target: ${widget.plan.prescribedRounds} rounds'),
+            for (final ConditioningMovement movement in widget.plan.movements)
+              _MovementEntryCard(
+                movement: movement,
+                progress: progress.movements[movement.id] ??
+                    const ConditioningMovementProgress(),
+                onChanged: (ConditioningMovementProgress value) {
+                  controller.updateMovement(
+                      widget.workoutId, movement.id, value);
+                },
+              ),
             Row(
               children: <Widget>[
                 Expanded(
@@ -345,24 +488,9 @@ class _ConditioningEntryCard extends ConsumerWidget {
                         value: progress.seconds,
                         onChanged: (String value) =>
                             update(progress.copyWith(seconds: value)))),
-                const SizedBox(width: 8),
-                Expanded(
-                    child: _ConditioningField(
-                        label: 'Weight kg',
-                        value: progress.weight,
-                        decimal: true,
-                        onChanged: (String value) =>
-                            update(progress.copyWith(weight: value)))),
               ],
             ),
             const SizedBox(height: 8),
-            TextFormField(
-              initialValue: progress.scaling,
-              decoration: const InputDecoration(
-                  labelText: 'Scaling or modification', isDense: true),
-              onChanged: (String value) =>
-                  update(progress.copyWith(scaling: value)),
-            ),
             CheckboxListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('Conditioning completed'),
@@ -372,6 +500,122 @@ class _ConditioningEntryCard extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  String _durationLabel(Duration duration) {
+    return '${duration.inMinutes.toString().padLeft(2, '0')}:'
+        '${duration.inSeconds.remainder(60).toString().padLeft(2, '0')}';
+  }
+}
+
+class _PreviousConditioningCard extends StatelessWidget {
+  const _PreviousConditioningCard({required this.workout, required this.plan});
+
+  final Workout workout;
+  final ConditioningPlan plan;
+
+  @override
+  Widget build(BuildContext context) {
+    final ConditioningResult result = workout.conditioningResult!;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text('Last ${workout.name}'),
+            Text(_resultLabel(result)),
+            for (final ConditioningMovement movement in plan.movements)
+              Text(_movementLabel(movement, result)),
+            if (result.scaling != null) Text(result.scaling!),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _resultLabel(ConditioningResult result) {
+    final String time = result.completionTime == null
+        ? ''
+        : ' — ${result.completionTime!.inMinutes}:'
+            '${result.completionTime!.inSeconds.remainder(60).toString().padLeft(2, '0')}';
+    return '${result.roundsCompleted} rounds$time';
+  }
+
+  String _movementLabel(
+    ConditioningMovement movement,
+    ConditioningResult result,
+  ) {
+    ConditioningMovementResult? recorded;
+    for (final ConditioningMovementResult value in result.movementResults) {
+      if (value.movementId == movement.id) {
+        recorded = value;
+        break;
+      }
+    }
+    if (recorded?.actualLoad != null) {
+      final int count = recorded?.implementCount ?? movement.implementCount;
+      final String prefix = count > 1 ? '$count × ' : '';
+      return '${movement.name}: $prefix${recorded!.actualLoad!.toStringAsFixed(0)} kg';
+    }
+    return '${movement.name}: '
+        '${movement.isBodyweight ? 'Bodyweight' : 'No load recorded'}';
+  }
+}
+
+class _MovementEntryCard extends StatelessWidget {
+  const _MovementEntryCard({
+    required this.movement,
+    required this.progress,
+    required this.onChanged,
+  });
+
+  final ConditioningMovement movement;
+  final ConditioningMovementProgress progress;
+  final ValueChanged<ConditioningMovementProgress> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final String target = movement.prescribedReps != null
+        ? '${movement.prescribedReps} reps'
+        : '${movement.prescribedDistance?.toStringAsFixed(0) ?? ''} '
+            '${movement.distanceUnit == DistanceUnit.metres ? 'm' : 'km'}';
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(movement.name, style: Theme.of(context).textTheme.titleSmall),
+          Text(movement.isBodyweight ? '$target • Bodyweight' : target),
+          if (!movement.isBodyweight)
+            Row(
+              children: <Widget>[
+                Expanded(
+                    child: _ConditioningField(
+                        label: 'Weight kg',
+                        value: progress.load,
+                        decimal: true,
+                        onChanged: (String value) =>
+                            onChanged(progress.copyWith(load: value)))),
+                const SizedBox(width: 8),
+                Expanded(
+                    child: _ConditioningField(
+                        label: 'Dumbbells / implements',
+                        value: progress.implementCount,
+                        onChanged: (String value) => onChanged(
+                            progress.copyWith(implementCount: value)))),
+              ],
+            ),
+          TextFormField(
+            initialValue: progress.modification,
+            decoration: const InputDecoration(
+                labelText: 'Modification (optional)', isDense: true),
+            onChanged: (String value) =>
+                onChanged(progress.copyWith(modification: value)),
+          ),
+        ],
       ),
     );
   }

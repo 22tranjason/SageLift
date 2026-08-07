@@ -32,6 +32,7 @@ class WorkoutSeedService {
         existingWorkouts: existingWorkouts,
       );
       await _seedMissingCrossFitData();
+      await _upgradePlannedCrossFitWorkouts();
       await _reconcileRecommendedPlannedWorkout(WorkoutTrack.strengthPpl);
       await _reconcileRecommendedPlannedWorkout(WorkoutTrack.crossFit);
       return;
@@ -98,6 +99,30 @@ class WorkoutSeedService {
       if (!workouts.any((Workout existing) => existing.id == workout.id)) {
         await _workoutRepository.save(workout);
       }
+    }
+  }
+
+  /// Adds structured movement plans only to legacy, still-planned CrossFit
+  /// templates. Completed sessions retain their original factual records.
+  Future<void> _upgradePlannedCrossFitWorkouts() async {
+    final List<Workout> workouts = await _workoutRepository.getAll();
+    for (final Workout workout in workouts) {
+      if (workout.track != WorkoutTrack.crossFit ||
+          workout.status != WorkoutStatus.planned ||
+          (workout.conditioningPlan?.movements.isNotEmpty ?? false)) {
+        continue;
+      }
+      final List<Workout> seeds = _crossFitWorkouts
+          .where((Workout candidate) => candidate.id == workout.id)
+          .toList(growable: false);
+      if (seeds.isEmpty) continue;
+      final Workout seed = seeds.first;
+      await _workoutRepository.save(
+        workout.copyWith(
+          conditioningPlan: seed.conditioningPlan,
+          sessionDurationTarget: seed.sessionDurationTarget,
+        ),
+      );
     }
   }
 
@@ -679,12 +704,34 @@ class WorkoutSeedService {
             setCount: 5,
             notes: 'Band-assisted; use a controlled chest-to-bar pull'),
       ],
-      conditioningPlan: const ConditioningPlan(
+      conditioningPlan: ConditioningPlan(
         format: ConditioningFormat.roundsForTime,
         title: '4 rounds for time',
         prescribedRounds: 4,
         instructions:
             '20 Step-ups\n200 m Run\n10 Dumbbell Clean & Press\n5 Scaled Wall Walks',
+        movements: const <ConditioningMovement>[
+          ConditioningMovement(
+              id: 'step-ups',
+              name: 'Step-ups',
+              prescribedReps: 20,
+              isBodyweight: true),
+          ConditioningMovement(
+              id: 'run',
+              name: 'Run',
+              prescribedDistance: 200,
+              distanceUnit: DistanceUnit.metres,
+              isBodyweight: true),
+          ConditioningMovement(
+              id: 'db-clean-press',
+              name: 'Dumbbell Clean & Press',
+              prescribedReps: 10),
+          ConditioningMovement(
+              id: 'wall-walk',
+              name: 'Scaled Wall Walk',
+              prescribedReps: 5,
+              isBodyweight: true),
+        ],
       ),
     ),
     _crossFitWorkout(
@@ -699,12 +746,34 @@ class WorkoutSeedService {
             setCount: 5,
             notes: 'Rest 90–120 sec'),
       ],
-      conditioningPlan: const ConditioningPlan(
+      conditioningPlan: ConditioningPlan(
         format: ConditioningFormat.roundsForTime,
         title: '4 rounds for time',
         prescribedRounds: 4,
         instructions:
             '12 Alternating Goblet Reverse Lunges (6 each leg)\n15 Dumbbell Deadlifts\n12 Step-ups (6 each leg)\n200 m Run\nScaling: replace step-ups with 15 Air Squats if no safe platform is available.',
+        movements: const <ConditioningMovement>[
+          ConditioningMovement(
+              id: 'goblet-reverse-lunge',
+              name: 'Goblet Reverse Lunge',
+              prescribedReps: 12),
+          ConditioningMovement(
+              id: 'dumbbell-deadlift',
+              name: 'Dumbbell Deadlift',
+              prescribedReps: 15,
+              implementCount: 2),
+          ConditioningMovement(
+              id: 'step-ups',
+              name: 'Step-ups',
+              prescribedReps: 12,
+              isBodyweight: true),
+          ConditioningMovement(
+              id: 'run',
+              name: 'Run',
+              prescribedDistance: 200,
+              distanceUnit: DistanceUnit.metres,
+              isBodyweight: true),
+        ],
       ),
     ),
     _crossFitWorkout(
@@ -717,12 +786,35 @@ class WorkoutSeedService {
             setCount: 5,
             notes: 'Strength: 5 × 5'),
       ],
-      conditioningPlan: const ConditioningPlan(
+      conditioningPlan: ConditioningPlan(
         format: ConditioningFormat.amrap,
         title: '12-minute AMRAP',
         durationMinutes: 12,
         instructions:
             '8 Dumbbell Romanian Deadlifts\n10 Push-ups\n12 Air Squats\n200 m Run\nScaling: elevated/incline push-ups are allowed.',
+        movements: const <ConditioningMovement>[
+          ConditioningMovement(
+              id: 'db-rdl',
+              name: 'Dumbbell Romanian Deadlift',
+              prescribedReps: 8,
+              implementCount: 2),
+          ConditioningMovement(
+              id: 'push-up',
+              name: 'Push-up',
+              prescribedReps: 10,
+              isBodyweight: true),
+          ConditioningMovement(
+              id: 'air-squat',
+              name: 'Air Squat',
+              prescribedReps: 12,
+              isBodyweight: true),
+          ConditioningMovement(
+              id: 'run',
+              name: 'Run',
+              prescribedDistance: 200,
+              distanceUnit: DistanceUnit.metres,
+              isBodyweight: true),
+        ],
       ),
     ),
     _crossFitWorkout(
@@ -740,12 +832,31 @@ class WorkoutSeedService {
             setCount: 4,
             notes: 'Strength: 4 × 8'),
       ],
-      conditioningPlan: const ConditioningPlan(
+      conditioningPlan: ConditioningPlan(
         format: ConditioningFormat.roundsForTime,
         title: '4 rounds for time',
         prescribedRounds: 4,
         instructions:
             '10 Dumbbell Rows (5 each side)\n10 Push-ups\n12 Dumbbell Goblet Squats\n200 m Run',
+        movements: const <ConditioningMovement>[
+          ConditioningMovement(
+              id: 'db-row', name: 'Dumbbell Row', prescribedReps: 10),
+          ConditioningMovement(
+              id: 'push-up',
+              name: 'Push-up',
+              prescribedReps: 10,
+              isBodyweight: true),
+          ConditioningMovement(
+              id: 'db-goblet-squat',
+              name: 'Dumbbell Goblet Squat',
+              prescribedReps: 12),
+          ConditioningMovement(
+              id: 'run',
+              name: 'Run',
+              prescribedDistance: 200,
+              distanceUnit: DistanceUnit.metres,
+              isBodyweight: true),
+        ],
       ),
     ),
     _crossFitWorkout(
@@ -759,12 +870,27 @@ class WorkoutSeedService {
             notes:
                 '5 each side; keep load deliberately light and technique-focused.'),
       ],
-      conditioningPlan: const ConditioningPlan(
+      conditioningPlan: ConditioningPlan(
         format: ConditioningFormat.emom,
         title: '15-minute EMOM',
         durationMinutes: 15,
         instructions:
             'Minute 1: 10 Dumbbell Goblet Squats\nMinute 2: 8 Dumbbell Clean & Press (4 each side)\nMinute 3: 40 sec brisk run / shuttle / fast walk\nRepeat for 5 cycles.',
+        movements: const <ConditioningMovement>[
+          ConditioningMovement(
+              id: 'db-goblet-squat',
+              name: 'Dumbbell Goblet Squat',
+              prescribedReps: 10),
+          ConditioningMovement(
+              id: 'db-clean-press',
+              name: 'Dumbbell Clean & Press',
+              prescribedReps: 8),
+          ConditioningMovement(
+              id: 'brisk-run',
+              name: 'Brisk run / shuttle / fast walk',
+              notes: '40 sec',
+              isBodyweight: true),
+        ],
       ),
     ),
     _crossFitWorkout(
@@ -777,12 +903,39 @@ class WorkoutSeedService {
             setCount: 4,
             notes: 'Strength: 4 × 10'),
       ],
-      conditioningPlan: const ConditioningPlan(
+      conditioningPlan: ConditioningPlan(
         format: ConditioningFormat.amrap,
         title: '20-minute AMRAP',
         durationMinutes: 20,
         instructions:
             '200 m Run\n10 Dumbbell Deadlifts\n10 Step-ups\n8 Dumbbell Push Press\n10 Sit-ups\nScaling: replace step-ups with 15 Air Squats if no safe platform is available.',
+        movements: const <ConditioningMovement>[
+          ConditioningMovement(
+              id: 'run',
+              name: 'Run',
+              prescribedDistance: 200,
+              distanceUnit: DistanceUnit.metres,
+              isBodyweight: true),
+          ConditioningMovement(
+              id: 'dumbbell-deadlift',
+              name: 'Dumbbell Deadlift',
+              prescribedReps: 10,
+              implementCount: 2),
+          ConditioningMovement(
+              id: 'step-ups',
+              name: 'Step-ups',
+              prescribedReps: 10,
+              isBodyweight: true),
+          ConditioningMovement(
+              id: 'db-push-press',
+              name: 'Dumbbell Push Press',
+              prescribedReps: 8),
+          ConditioningMovement(
+              id: 'sit-up',
+              name: 'Sit-up',
+              prescribedReps: 10,
+              isBodyweight: true),
+        ],
       ),
     ),
   ];
@@ -845,6 +998,7 @@ class WorkoutSeedService {
       track: WorkoutTrack.crossFit,
       warmUp: warmUp,
       conditioningPlan: conditioningPlan,
+      sessionDurationTarget: '35–45 min',
     );
   }
 }

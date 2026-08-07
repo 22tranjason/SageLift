@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:sagelift/features/workouts/data/adapters/workout_hive_adapters.dart';
 import 'package:sagelift/features/workouts/data/local/workout_hive_store.dart';
+import 'package:sagelift/features/workouts/data/models/workout_hive_model.dart';
+import 'package:sagelift/features/workouts/data/models/workout_set_hive_model.dart';
 import 'package:sagelift/features/workouts/data/repositories/hive_exercise_repository.dart';
 import 'package:sagelift/features/workouts/data/repositories/hive_workout_repository.dart';
 import 'package:sagelift/features/workouts/data/services/workout_seed_service.dart';
@@ -221,25 +223,73 @@ void main() {
       status: WorkoutStatus.completed,
       track: WorkoutTrack.crossFit,
       completedAt: DateTime.utc(2026, 8, 8, 7),
-      conditioningPlan: const ConditioningPlan(
+      conditioningPlan: ConditioningPlan(
         format: ConditioningFormat.roundsForTime,
         title: '4 rounds for time',
         instructions: 'Test movements',
         prescribedRounds: 4,
       ),
-      conditioningResult: const ConditioningResult(
+      conditioningResult: ConditioningResult(
         roundsCompleted: 3,
         additionalReps: 12,
         completionTime: Duration(minutes: 18, seconds: 42),
         weightKg: 10,
         scaling: 'Step-ups and band-assisted pull-ups',
         isCompleted: false,
+        movementResults: const <ConditioningMovementResult>[
+          ConditioningMovementResult(
+            movementId: 'goblet-reverse-lunge',
+            actualLoad: 15,
+          ),
+          ConditioningMovementResult(
+            movementId: 'dumbbell-deadlift',
+            actualLoad: 15,
+            implementCount: 2,
+          ),
+        ],
       ),
     );
 
     await repository.save(workout);
 
     expect(await repository.getById(workout.id), workout);
+  });
+
+  test('decodes legacy generic conditioning data without movement records',
+      () async {
+    final WorkoutHiveStore store = await WorkoutHiveStore.open();
+    final HiveWorkoutRepository repository = HiveWorkoutRepository(
+      store.workoutBox,
+    );
+    await store.workoutBox.put(
+      'legacy-crossfit-b',
+      WorkoutHiveModel(
+        id: 'legacy-crossfit-b',
+        name: 'CrossFit B',
+        scheduledDateMilliseconds:
+            DateTime.utc(2026, 8, 1).millisecondsSinceEpoch,
+        exerciseIds: const <String>[],
+        sets: const <WorkoutSetHiveModel>[],
+        statusIndex: WorkoutStatus.completed.index,
+        trackIndex: WorkoutTrack.crossFit.index,
+        conditioningFormatIndex: ConditioningFormat.roundsForTime.index,
+        conditioningTitle: '4 rounds for time',
+        conditioningInstructions: 'Legacy instructions',
+        prescribedRounds: 4,
+        roundsCompleted: 4,
+        additionalReps: 0,
+        completionTimeMilliseconds: const Duration(minutes: 30).inMilliseconds,
+        conditioningScaling:
+            '15kg goblet lunges; 2 x 15kg DB deadlifts; step-ups.',
+        conditioningCompleted: true,
+      ),
+    );
+
+    final Workout? decoded = await repository.getById('legacy-crossfit-b');
+
+    expect(decoded?.conditioningResult?.roundsCompleted, 4);
+    expect(decoded?.conditioningResult?.movementResults, isEmpty);
+    expect(decoded?.conditioningResult?.scaling, contains('goblet lunges'));
   });
 }
 

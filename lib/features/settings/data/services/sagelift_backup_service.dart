@@ -277,6 +277,9 @@ Map<String, Object?> _workoutToJson(WorkoutHiveModel value) =>
       'conditioningWeightKg': value.conditioningWeightKg,
       'conditioningScaling': value.conditioningScaling,
       'conditioningCompleted': value.conditioningCompleted,
+      'sessionDurationTarget': value.sessionDurationTarget,
+      'conditioningMovementsJson': value.conditioningMovementsJson,
+      'conditioningMovementResultsJson': value.conditioningMovementResultsJson,
     };
 
 WorkoutHiveModel _workoutFromJson(Map<String, dynamic> value) =>
@@ -305,6 +308,10 @@ WorkoutHiveModel _workoutFromJson(Map<String, dynamic> value) =>
       conditioningWeightKg: _nullableDouble(value, 'conditioningWeightKg'),
       conditioningScaling: value['conditioningScaling'] as String?,
       conditioningCompleted: _nullableBool(value, 'conditioningCompleted'),
+      sessionDurationTarget: value['sessionDurationTarget'] as String?,
+      conditioningMovementsJson: value['conditioningMovementsJson'] as String?,
+      conditioningMovementResultsJson:
+          value['conditioningMovementResultsJson'] as String?,
     );
 
 Map<String, Object?> _setToJson(WorkoutSetHiveModel value) => <String, Object?>{

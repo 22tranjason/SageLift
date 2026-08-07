@@ -112,13 +112,16 @@ class WorkoutHiveModelAdapter extends TypeAdapter<WorkoutHiveModel> {
       conditioningWeightKg: fields[19] as double?,
       conditioningScaling: fields[20] as String?,
       conditioningCompleted: fields[21] as bool?,
+      sessionDurationTarget: fields[22] as String?,
+      conditioningMovementsJson: fields[23] as String?,
+      conditioningMovementResultsJson: fields[24] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, WorkoutHiveModel object) {
     writer
-      ..writeByte(22)
+      ..writeByte(25)
       ..writeByte(0)
       ..write(object.id)
       ..writeByte(1)
@@ -162,7 +165,13 @@ class WorkoutHiveModelAdapter extends TypeAdapter<WorkoutHiveModel> {
       ..writeByte(20)
       ..write(object.conditioningScaling)
       ..writeByte(21)
-      ..write(object.conditioningCompleted);
+      ..write(object.conditioningCompleted)
+      ..writeByte(22)
+      ..write(object.sessionDurationTarget)
+      ..writeByte(23)
+      ..write(object.conditioningMovementsJson)
+      ..writeByte(24)
+      ..write(object.conditioningMovementResultsJson);
   }
 }
 

@@ -62,6 +62,11 @@ class WorkoutDetailsScreen extends ConsumerWidget {
                     label: 'Duration',
                     value: '${summary.duration.inMinutes} min',
                   ),
+                  if (summary.workout.sessionDurationTarget != null)
+                    _DetailRow(
+                      label: 'Target session duration',
+                      value: summary.workout.sessionDurationTarget!,
+                    ),
                   _DetailRow(
                     label: 'Exercises completed',
                     value: '${summary.exercisesCompleted}',
