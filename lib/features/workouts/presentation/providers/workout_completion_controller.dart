@@ -142,7 +142,9 @@ class WorkoutCompletionController {
           savedWorkout.completedAt == null) {
         throw StateError('Unable to save the completed workout.');
       }
-      await _ensureRecommendedPlannedWorkout(workout.track);
+      if (workout.track == WorkoutTrack.hybrid) {
+        await _ensureRecommendedPlannedWorkout(WorkoutTrack.hybrid);
+      }
       _clearConditioningProgress();
       _onWorkoutChanged();
       return savedWorkout;
@@ -158,10 +160,10 @@ class WorkoutCompletionController {
     String workoutName, {
     bool replaceInProgress = false,
   }) async {
-    final WorkoutTrack? track = WorkoutProgram.trackForWorkoutName(workoutName);
-    if (track == null) {
+    if (!WorkoutProgram.isSelectableWorkoutName(workoutName)) {
       throw ArgumentError.value(workoutName, 'workoutName');
     }
+    const WorkoutTrack track = WorkoutTrack.hybrid;
     final List<Workout> workouts = await _workoutRepository.getAll();
     final List<Workout> activeWorkouts = workouts
         .where((Workout workout) => workout.status == WorkoutStatus.inProgress)
@@ -209,10 +211,12 @@ class WorkoutCompletionController {
     final Workout? workout = await _workoutRepository.getById(workoutId);
     if (workout == null || workout.status != WorkoutStatus.completed) return;
     await _workoutRepository.delete(workoutId);
-    await _ensureRecommendedPlannedWorkout(
-      workout.track,
-      fallbackTemplate: workout,
-    );
+    if (workout.track == WorkoutTrack.hybrid) {
+      await _ensureRecommendedPlannedWorkout(
+        WorkoutTrack.hybrid,
+        fallbackTemplate: workout,
+      );
+    }
     _onWorkoutChanged();
   }
 

@@ -6,7 +6,7 @@ import '../../domain/repositories/exercise_repository.dart';
 import '../../domain/repositories/workout_repository.dart';
 import '../../domain/services/workout_program.dart';
 
-/// Adds Jason's PPL and CrossFit programmes without replacing local history.
+/// Adds future Hybrid templates without changing any historical records.
 class WorkoutSeedService {
   /// Creates a seed service over the workout and exercise repositories.
   const WorkoutSeedService({
@@ -18,952 +18,333 @@ class WorkoutSeedService {
   final ExerciseRepository _exerciseRepository;
   final WorkoutRepository _workoutRepository;
 
-  /// Inserts both programmes when the workout database is completely empty.
+  /// Inserts missing Hybrid catalogue entries and templates idempotently.
   ///
-  /// Repeated calls never reseed or delete history. They safely upgrade planned
-  /// Push A sessions, adds the independent CrossFit seed to established PPL
-  /// databases, and reconciles one planned session for each programme.
+  /// Existing PPL and CrossFit records are neither read as programme state nor
+  /// modified. This makes the migration additive for existing devices.
   Future<void> seedIfEmpty() async {
-    final List<Exercise> existingExercises = await _exerciseRepository.getAll();
-    final List<Workout> existingWorkouts = await _workoutRepository.getAll();
-    if (existingExercises.isNotEmpty || existingWorkouts.isNotEmpty) {
-      await _upgradePlannedPushA(
-        existingExercises: existingExercises,
-        existingWorkouts: existingWorkouts,
-      );
-      await _seedMissingCrossFitData();
-      await _upgradePlannedCrossFitWorkouts();
-      await _reconcileRecommendedPlannedWorkout(WorkoutTrack.strengthPpl);
-      await _reconcileRecommendedPlannedWorkout(WorkoutTrack.crossFit);
-      return;
-    }
-
-    for (final Exercise exercise in _allExercises) {
-      await _exerciseRepository.save(exercise);
-    }
-    for (final Workout workout in _allWorkouts) {
-      await _workoutRepository.save(workout);
-    }
+    await _seedMissingHybridData();
+    await _reconcileRecommendedPlannedWorkout();
   }
 
-  /// Compatibility reconciliation for existing local databases.
-  ///
-  /// It preserves completed history and existing planned sessions. A new session
-  /// is created only when the recommended program name has no planned record.
-  Future<void> _reconcileRecommendedPlannedWorkout(WorkoutTrack track) async {
-    final List<Workout> workouts = await _workoutRepository.getAll();
-    if (workouts.any(
-      (Workout workout) => workout.status == WorkoutStatus.inProgress,
-    )) {
-      return;
-    }
-    final String recommendedName = WorkoutProgram.recommendedNextWorkoutName(
-      workouts,
-      track: track,
-    );
-    if (workouts.any(
-      (Workout workout) =>
-          workout.status == WorkoutStatus.planned &&
-          workout.track == track &&
-          workout.name == recommendedName,
-    )) {
-      return;
-    }
-    final List<Workout> templates = workouts
-        .where((Workout workout) => workout.name == recommendedName)
-        .toList(growable: false)
-      ..sort((Workout first, Workout second) => first.id.compareTo(second.id));
-    if (templates.isEmpty) return;
-    final DateTime now = DateTime.now();
-    final String sessionId = 'program-migration-'
-        '${recommendedName.toLowerCase().replaceAll(' ', '-')}-'
-        '${now.microsecondsSinceEpoch}-${workouts.length}';
-    await _workoutRepository.save(
-      WorkoutProgram.createPlannedSession(
-        template: templates.first,
-        id: sessionId,
-        scheduledDate: DateTime(now.year, now.month, now.day),
-      ),
-    );
-  }
-
-  Future<void> _seedMissingCrossFitData() async {
+  Future<void> _seedMissingHybridData() async {
     final List<Exercise> exercises = await _exerciseRepository.getAll();
-    for (final Exercise exercise in _crossFitExercises) {
-      if (!exercises.any((Exercise existing) => existing.id == exercise.id)) {
+    for (final Exercise exercise in _hybridExercises) {
+      if (!exercises.any((Exercise value) => value.id == exercise.id)) {
         await _exerciseRepository.save(exercise);
       }
     }
+
     final List<Workout> workouts = await _workoutRepository.getAll();
-    for (final Workout workout in _crossFitWorkouts) {
-      if (!workouts.any((Workout existing) => existing.id == workout.id)) {
+    for (final Workout workout in _hybridWorkouts) {
+      if (!workouts.any((Workout value) => value.id == workout.id)) {
         await _workoutRepository.save(workout);
       }
     }
   }
 
-  /// Adds structured movement plans only to legacy, still-planned CrossFit
-  /// templates. Completed sessions retain their original factual records.
-  Future<void> _upgradePlannedCrossFitWorkouts() async {
+  Future<void> _reconcileRecommendedPlannedWorkout() async {
     final List<Workout> workouts = await _workoutRepository.getAll();
-    for (final Workout workout in workouts) {
-      if (workout.track != WorkoutTrack.crossFit ||
-          workout.status != WorkoutStatus.planned ||
-          (workout.conditioningPlan?.movements.isNotEmpty ?? false)) {
-        continue;
-      }
-      final List<Workout> seeds = _crossFitWorkouts
-          .where((Workout candidate) => candidate.id == workout.id)
-          .toList(growable: false);
-      if (seeds.isEmpty) continue;
-      final Workout seed = seeds.first;
-      await _workoutRepository.save(
-        workout.copyWith(
-          conditioningPlan: seed.conditioningPlan,
-          sessionDurationTarget: seed.sessionDurationTarget,
-        ),
-      );
-    }
-  }
-
-  Future<void> _upgradePlannedPushA({
-    required List<Exercise> existingExercises,
-    required List<Workout> existingWorkouts,
-  }) async {
-    final Exercise overheadRopeExtension = _exercises.singleWhere(
-      (Exercise exercise) => exercise.id == _pushAExtension.exerciseId,
-    );
-    if (!existingExercises.any(
-      (Exercise exercise) => exercise.id == _pushAExtension.exerciseId,
+    if (workouts.any(
+      (Workout workout) =>
+          workout.track == WorkoutTrack.hybrid &&
+          workout.status == WorkoutStatus.inProgress,
     )) {
-      await _exerciseRepository.save(overheadRopeExtension);
+      return;
     }
-
-    for (final Workout workout in existingWorkouts) {
-      if (workout.name != 'Push A' ||
-          workout.status != WorkoutStatus.planned ||
-          workout.exerciseIds.contains(_pushAExtension.exerciseId)) {
-        continue;
-      }
-      final List<WorkoutSet> extensionSets = <WorkoutSet>[
-        for (int setNumber = 1;
-            setNumber <= _pushAExtension.setCount;
-            setNumber++)
-          WorkoutSet(
-            id: 'seed-set-${workout.id}-${_pushAExtension.exerciseId}-$setNumber',
-            exerciseId: _pushAExtension.exerciseId,
-            setNumber: setNumber,
-            targetReps: _pushAExtension.targetReps,
-            status: WorkoutSetStatus.planned,
-            notes: _pushAExtension.notes,
-          ),
-      ];
-      await _workoutRepository.save(
-        workout.copyWith(
-          exerciseIds: <String>[
-            ...workout.exerciseIds,
-            _pushAExtension.exerciseId,
-          ],
-          sets: <WorkoutSet>[...workout.sets, ...extensionSets],
-        ),
-      );
+    final String recommendedName = WorkoutProgram.recommendedNextWorkoutName(
+      workouts,
+      track: WorkoutTrack.hybrid,
+    );
+    if (workouts.any(
+      (Workout workout) =>
+          workout.track == WorkoutTrack.hybrid &&
+          workout.status == WorkoutStatus.planned &&
+          workout.name == recommendedName,
+    )) {
+      return;
     }
+    final List<Workout> templates = workouts
+        .where(
+          (Workout workout) =>
+              workout.track == WorkoutTrack.hybrid &&
+              workout.name == recommendedName,
+        )
+        .toList(growable: false)
+      ..sort((Workout first, Workout second) => first.id.compareTo(second.id));
+    if (templates.isEmpty) {
+      return;
+    }
+    final DateTime now = DateTime.now();
+    await _workoutRepository.save(
+      WorkoutProgram.createPlannedSession(
+        template: templates.first,
+        id: 'program-migration-'
+            '${recommendedName.toLowerCase().replaceAll(' ', '-')}-'
+            '${now.microsecondsSinceEpoch}-${workouts.length}',
+        scheduledDate: DateTime(now.year, now.month, now.day),
+      ),
+    );
   }
 
-  static const List<Exercise> _exercises = <Exercise>[
-    Exercise(
-      id: 'seed-exercise-barbell-bench-press',
-      name: 'Barbell Bench Press',
-      category: ExerciseCategory.strength,
-      primaryMuscleGroup: MuscleGroup.chest,
-      equipment: Equipment.barbell,
-    ),
-    Exercise(
-      id: 'seed-exercise-incline-dumbbell-press',
-      name: 'Incline Dumbbell Press',
-      category: ExerciseCategory.strength,
-      primaryMuscleGroup: MuscleGroup.chest,
-      equipment: Equipment.dumbbells,
-    ),
-    Exercise(
-      id: 'seed-exercise-seated-dumbbell-shoulder-press',
-      name: 'Seated Dumbbell Shoulder Press',
-      category: ExerciseCategory.strength,
-      primaryMuscleGroup: MuscleGroup.shoulders,
-      equipment: Equipment.dumbbells,
-    ),
-    Exercise(
-      id: 'seed-exercise-dumbbell-lateral-raise',
-      name: 'Dumbbell Lateral Raise',
-      category: ExerciseCategory.strength,
-      primaryMuscleGroup: MuscleGroup.shoulders,
-      equipment: Equipment.dumbbells,
-    ),
-    Exercise(
-      id: 'seed-exercise-cable-triceps-pushdown',
-      name: 'Cable Triceps Pushdown',
-      category: ExerciseCategory.strength,
-      primaryMuscleGroup: MuscleGroup.arms,
-      equipment: Equipment.cableMachine,
-    ),
-    Exercise(
-      id: 'seed-exercise-overhead-rope-triceps-extension',
-      name: 'Overhead Rope Triceps Extension',
-      category: ExerciseCategory.strength,
-      primaryMuscleGroup: MuscleGroup.arms,
-      equipment: Equipment.cableMachine,
-    ),
-    Exercise(
-      id: 'seed-exercise-barbell-bent-over-row',
-      name: 'Barbell Bent-Over Row',
-      category: ExerciseCategory.strength,
-      primaryMuscleGroup: MuscleGroup.back,
-      equipment: Equipment.barbell,
-    ),
-    Exercise(
-      id: 'seed-exercise-one-arm-dumbbell-row',
-      name: 'One-Arm Dumbbell Row',
-      category: ExerciseCategory.strength,
-      primaryMuscleGroup: MuscleGroup.back,
-      equipment: Equipment.dumbbells,
-    ),
-    Exercise(
-      id: 'seed-exercise-cable-lat-pulldown',
-      name: 'Cable Lat Pulldown',
-      category: ExerciseCategory.strength,
-      primaryMuscleGroup: MuscleGroup.back,
-      equipment: Equipment.cableMachine,
-    ),
-    Exercise(
-      id: 'seed-exercise-dumbbell-rear-delt-fly',
-      name: 'Dumbbell Rear-Delt Fly',
-      category: ExerciseCategory.strength,
-      primaryMuscleGroup: MuscleGroup.shoulders,
-      equipment: Equipment.dumbbells,
-    ),
-    Exercise(
-      id: 'seed-exercise-dumbbell-hammer-curl',
-      name: 'Dumbbell Hammer Curl',
-      category: ExerciseCategory.strength,
-      primaryMuscleGroup: MuscleGroup.arms,
-      equipment: Equipment.dumbbells,
-    ),
-    Exercise(
-      id: 'seed-exercise-barbell-back-squat',
-      name: 'Barbell Back Squat',
-      category: ExerciseCategory.strength,
-      primaryMuscleGroup: MuscleGroup.legs,
-      equipment: Equipment.barbell,
-    ),
-    Exercise(
-      id: 'seed-exercise-romanian-deadlift',
-      name: 'Romanian Deadlift',
-      category: ExerciseCategory.strength,
-      primaryMuscleGroup: MuscleGroup.legs,
-      equipment: Equipment.barbell,
-    ),
-    Exercise(
-      id: 'seed-exercise-dumbbell-reverse-lunge',
-      name: 'Dumbbell Reverse Lunge',
-      category: ExerciseCategory.strength,
-      primaryMuscleGroup: MuscleGroup.legs,
-      equipment: Equipment.dumbbells,
-    ),
-    Exercise(
-      id: 'seed-exercise-standing-dumbbell-calf-raise',
-      name: 'Standing Dumbbell Calf Raise',
-      category: ExerciseCategory.strength,
-      primaryMuscleGroup: MuscleGroup.legs,
-      equipment: Equipment.dumbbells,
-    ),
-    Exercise(
-      id: 'seed-exercise-plank',
-      name: 'Plank',
-      category: ExerciseCategory.strength,
-      primaryMuscleGroup: MuscleGroup.core,
-      equipment: Equipment.bodyweight,
-    ),
-    Exercise(
-      id: 'seed-exercise-incline-barbell-bench-press',
-      name: 'Incline Barbell Bench Press',
-      category: ExerciseCategory.strength,
-      primaryMuscleGroup: MuscleGroup.chest,
-      equipment: Equipment.barbell,
-    ),
-    Exercise(
-      id: 'seed-exercise-flat-dumbbell-bench-press',
-      name: 'Flat Dumbbell Bench Press',
-      category: ExerciseCategory.strength,
-      primaryMuscleGroup: MuscleGroup.chest,
-      equipment: Equipment.dumbbells,
-    ),
-    Exercise(
-      id: 'seed-exercise-standing-barbell-overhead-press',
-      name: 'Standing Barbell Overhead Press',
-      category: ExerciseCategory.strength,
-      primaryMuscleGroup: MuscleGroup.shoulders,
-      equipment: Equipment.barbell,
-    ),
-    Exercise(
-      id: 'seed-exercise-overhead-dumbbell-triceps-extension',
-      name: 'Overhead Dumbbell Triceps Extension',
-      category: ExerciseCategory.strength,
-      primaryMuscleGroup: MuscleGroup.arms,
-      equipment: Equipment.dumbbells,
-    ),
-    Exercise(
-      id: 'seed-exercise-conventional-deadlift',
-      name: 'Conventional Deadlift',
-      category: ExerciseCategory.strength,
-      primaryMuscleGroup: MuscleGroup.legs,
-      equipment: Equipment.barbell,
-    ),
-    Exercise(
-      id: 'seed-exercise-chest-supported-dumbbell-row',
-      name: 'Chest-Supported Dumbbell Row on Incline Bench',
-      category: ExerciseCategory.strength,
-      primaryMuscleGroup: MuscleGroup.back,
-      equipment: Equipment.dumbbells,
-    ),
-    Exercise(
-      id: 'seed-exercise-cable-seated-row',
-      name: 'Cable Seated Row',
-      category: ExerciseCategory.strength,
-      primaryMuscleGroup: MuscleGroup.back,
-      equipment: Equipment.cableMachine,
-    ),
-    Exercise(
-      id: 'seed-exercise-cable-face-pull',
-      name: 'Cable Face Pull',
-      category: ExerciseCategory.strength,
-      primaryMuscleGroup: MuscleGroup.shoulders,
-      equipment: Equipment.cableMachine,
-    ),
-    Exercise(
-      id: 'seed-exercise-alternating-dumbbell-curl',
-      name: 'Alternating Dumbbell Curl',
-      category: ExerciseCategory.strength,
-      primaryMuscleGroup: MuscleGroup.arms,
-      equipment: Equipment.dumbbells,
-    ),
-    Exercise(
-      id: 'seed-exercise-barbell-front-squat',
-      name: 'Barbell Front Squat',
-      category: ExerciseCategory.strength,
-      primaryMuscleGroup: MuscleGroup.legs,
-      equipment: Equipment.barbell,
-    ),
-    Exercise(
-      id: 'seed-exercise-barbell-hip-thrust',
-      name: 'Barbell Hip Thrust',
-      category: ExerciseCategory.strength,
-      primaryMuscleGroup: MuscleGroup.glutes,
-      equipment: Equipment.barbell,
-    ),
-    Exercise(
-      id: 'seed-exercise-dumbbell-bulgarian-split-squat',
-      name: 'Dumbbell Bulgarian Split Squat',
-      category: ExerciseCategory.strength,
-      primaryMuscleGroup: MuscleGroup.legs,
-      equipment: Equipment.dumbbells,
-    ),
-    Exercise(
-      id: 'seed-exercise-lying-leg-raise',
-      name: 'Lying Leg Raise',
-      category: ExerciseCategory.strength,
-      primaryMuscleGroup: MuscleGroup.core,
-      equipment: Equipment.bodyweight,
-    ),
+  static final List<Exercise> _hybridExercises = <Exercise>[
+    _exercise('seed-exercise-barbell-bench-press', 'Barbell Bench Press',
+        MuscleGroup.chest, Equipment.barbell),
+    _exercise('seed-exercise-incline-dumbbell-press', 'Incline Dumbbell Press',
+        MuscleGroup.chest, Equipment.dumbbells),
+    _exercise(
+        'seed-exercise-seated-dumbbell-shoulder-press',
+        'Seated Dumbbell Shoulder Press',
+        MuscleGroup.shoulders,
+        Equipment.dumbbells),
+    _exercise('seed-exercise-dumbbell-lateral-raise', 'Dumbbell Lateral Raise',
+        MuscleGroup.shoulders, Equipment.dumbbells),
+    _exercise('seed-exercise-overhead-dumbbell-triceps-extension',
+        'Overhead Triceps Extension', MuscleGroup.arms, Equipment.dumbbells),
+    _exercise('seed-exercise-barbell-bent-over-row', 'Barbell Bent-Over Row',
+        MuscleGroup.back, Equipment.barbell),
+    _exercise('seed-exercise-cable-lat-pulldown', 'Cable Lat Pulldown',
+        MuscleGroup.back, Equipment.cableMachine),
+    _exercise('seed-exercise-one-arm-dumbbell-row', 'One-Arm Dumbbell Row',
+        MuscleGroup.back, Equipment.dumbbells),
+    _exercise('seed-exercise-dumbbell-rear-delt-fly', 'Dumbbell Rear-Delt Fly',
+        MuscleGroup.shoulders, Equipment.dumbbells),
+    _exercise('seed-exercise-dumbbell-hammer-curl', 'Dumbbell Hammer Curl',
+        MuscleGroup.arms, Equipment.dumbbells),
+    _exercise('seed-exercise-barbell-back-squat', 'Barbell Back Squat',
+        MuscleGroup.legs, Equipment.barbell),
+    _exercise('seed-exercise-romanian-deadlift', 'Romanian Deadlift',
+        MuscleGroup.legs, Equipment.barbell),
+    _exercise('seed-exercise-dumbbell-reverse-lunge', 'Dumbbell Reverse Lunge',
+        MuscleGroup.legs, Equipment.dumbbells),
+    _exercise('seed-exercise-standing-dumbbell-calf-raise',
+        'Standing Dumbbell Calf Raise', MuscleGroup.legs, Equipment.dumbbells),
+    _exercise(
+        'seed-exercise-plank', 'Plank', MuscleGroup.core, Equipment.bodyweight),
+    _exercise('seed-exercise-incline-barbell-bench-press',
+        'Incline Barbell Bench Press', MuscleGroup.chest, Equipment.barbell),
+    _exercise('seed-exercise-flat-dumbbell-bench-press',
+        'Flat Dumbbell Bench Press', MuscleGroup.chest, Equipment.dumbbells),
+    _exercise(
+        'seed-exercise-standing-barbell-overhead-press',
+        'Standing Barbell Overhead Press',
+        MuscleGroup.shoulders,
+        Equipment.barbell),
+    _exercise('seed-exercise-conventional-deadlift', 'Conventional Deadlift',
+        MuscleGroup.legs, Equipment.barbell),
+    _exercise(
+        'seed-exercise-chest-supported-dumbbell-row',
+        'Chest-Supported Dumbbell Row on Incline Bench',
+        MuscleGroup.back,
+        Equipment.dumbbells),
+    _exercise('seed-exercise-cable-seated-row', 'Cable Seated Row',
+        MuscleGroup.back, Equipment.cableMachine),
+    _exercise('seed-exercise-cable-face-pull', 'Cable Face Pull',
+        MuscleGroup.shoulders, Equipment.cableMachine),
+    _exercise('seed-exercise-alternating-dumbbell-curl',
+        'Alternating Dumbbell Curl', MuscleGroup.arms, Equipment.dumbbells),
+    _exercise('seed-exercise-barbell-front-squat', 'Barbell Front Squat',
+        MuscleGroup.legs, Equipment.barbell),
+    _exercise('seed-exercise-barbell-hip-thrust', 'Barbell Hip Thrust',
+        MuscleGroup.glutes, Equipment.barbell),
+    _exercise(
+        'seed-exercise-dumbbell-bulgarian-split-squat',
+        'Dumbbell Bulgarian Split Squat',
+        MuscleGroup.legs,
+        Equipment.dumbbells),
+    _exercise('seed-exercise-lying-leg-raise', 'Lying Leg Raise',
+        MuscleGroup.core, Equipment.bodyweight),
+    _exercise('hybrid-kettlebell-swing', 'Kettlebell Swing',
+        MuscleGroup.fullBody, Equipment.kettlebell,
+        category: ExerciseCategory.conditioning),
+    _exercise('hybrid-kettlebell-reverse-lunge', 'Kettlebell Reverse Lunge',
+        MuscleGroup.legs, Equipment.kettlebell,
+        category: ExerciseCategory.conditioning),
   ];
 
-  static const List<Exercise> _crossFitExercises = <Exercise>[
-    Exercise(
-        id: 'crossfit-push-press',
-        name: 'Barbell Push Press',
-        category: ExerciseCategory.strength,
-        primaryMuscleGroup: MuscleGroup.shoulders,
-        equipment: Equipment.barbell),
-    Exercise(
-        id: 'crossfit-band-chest-to-bar',
-        name: 'Band-Assisted Chest-to-Bar Pull-up',
-        category: ExerciseCategory.strength,
-        primaryMuscleGroup: MuscleGroup.back,
-        equipment: Equipment.resistanceBand),
-    Exercise(
-        id: 'crossfit-step-ups',
-        name: 'Step-ups',
-        category: ExerciseCategory.conditioning,
-        primaryMuscleGroup: MuscleGroup.legs,
-        equipment: Equipment.bodyweight),
-    Exercise(
-        id: 'crossfit-db-clean-press',
-        name: 'Dumbbell Clean & Press',
-        category: ExerciseCategory.conditioning,
-        primaryMuscleGroup: MuscleGroup.fullBody,
-        equipment: Equipment.dumbbells),
-    Exercise(
-        id: 'crossfit-scaled-wall-walk',
-        name: 'Scaled Wall Walk',
-        category: ExerciseCategory.conditioning,
-        primaryMuscleGroup: MuscleGroup.shoulders,
-        equipment: Equipment.bodyweight),
-    Exercise(
-        id: 'crossfit-air-squat',
-        name: 'Air Squat',
-        category: ExerciseCategory.conditioning,
-        primaryMuscleGroup: MuscleGroup.legs,
-        equipment: Equipment.bodyweight),
-    Exercise(
-        id: 'crossfit-reverse-lunge',
-        name: 'Alternating Goblet Reverse Lunge',
-        category: ExerciseCategory.conditioning,
-        primaryMuscleGroup: MuscleGroup.legs,
-        equipment: Equipment.dumbbells),
-    Exercise(
-        id: 'crossfit-db-deadlift',
-        name: 'Dumbbell Deadlift',
-        category: ExerciseCategory.conditioning,
-        primaryMuscleGroup: MuscleGroup.legs,
-        equipment: Equipment.dumbbells),
-    Exercise(
-        id: 'crossfit-barbell-deadlift',
-        name: 'Barbell Deadlift',
-        category: ExerciseCategory.strength,
-        primaryMuscleGroup: MuscleGroup.legs,
-        equipment: Equipment.barbell),
-    Exercise(
-        id: 'crossfit-db-rdl',
-        name: 'Dumbbell Romanian Deadlift',
-        category: ExerciseCategory.conditioning,
-        primaryMuscleGroup: MuscleGroup.legs,
-        equipment: Equipment.dumbbells),
-    Exercise(
-        id: 'crossfit-push-up',
-        name: 'Push-up',
-        category: ExerciseCategory.conditioning,
-        primaryMuscleGroup: MuscleGroup.chest,
-        equipment: Equipment.bodyweight),
-    Exercise(
-        id: 'crossfit-band-pull-up',
-        name: 'Band-Assisted Pull-up',
-        category: ExerciseCategory.strength,
-        primaryMuscleGroup: MuscleGroup.back,
-        equipment: Equipment.resistanceBand),
-    Exercise(
-        id: 'crossfit-db-bench-press',
-        name: 'Dumbbell Bench Press',
-        category: ExerciseCategory.strength,
-        primaryMuscleGroup: MuscleGroup.chest,
-        equipment: Equipment.dumbbells),
-    Exercise(
-        id: 'crossfit-db-row',
-        name: 'Dumbbell Row',
-        category: ExerciseCategory.conditioning,
-        primaryMuscleGroup: MuscleGroup.back,
-        equipment: Equipment.dumbbells),
-    Exercise(
-        id: 'crossfit-db-goblet-squat',
-        name: 'Dumbbell Goblet Squat',
-        category: ExerciseCategory.conditioning,
-        primaryMuscleGroup: MuscleGroup.legs,
-        equipment: Equipment.dumbbells),
-    Exercise(
-        id: 'crossfit-db-clean',
-        name: 'Dumbbell Clean',
-        category: ExerciseCategory.strength,
-        primaryMuscleGroup: MuscleGroup.fullBody,
-        equipment: Equipment.dumbbells),
-    Exercise(
-        id: 'crossfit-goblet-squat',
-        name: 'Goblet Squat',
-        category: ExerciseCategory.strength,
-        primaryMuscleGroup: MuscleGroup.legs,
-        equipment: Equipment.dumbbells),
-    Exercise(
-        id: 'crossfit-db-push-press',
-        name: 'Dumbbell Push Press',
-        category: ExerciseCategory.conditioning,
-        primaryMuscleGroup: MuscleGroup.shoulders,
-        equipment: Equipment.dumbbells),
-    Exercise(
-        id: 'crossfit-sit-up',
-        name: 'Sit-up',
-        category: ExerciseCategory.conditioning,
-        primaryMuscleGroup: MuscleGroup.core,
-        equipment: Equipment.bodyweight),
-  ];
-
-  static const List<Exercise> _allExercises = <Exercise>[
-    ..._exercises,
-    ..._crossFitExercises,
-  ];
-
-  static final List<Workout> _workouts = <Workout>[
-    _workout(
-      id: 'seed-workout-push-a',
-      name: 'Push A',
-      prescriptions: const <_ExercisePrescription>[
-        _ExercisePrescription(
-          exerciseId: 'seed-exercise-barbell-bench-press',
-          targetReps: 10,
-          notes: 'Target 6–10 reps; rest 2–3 min',
-        ),
-        _ExercisePrescription(
-          exerciseId: 'seed-exercise-incline-dumbbell-press',
-          targetReps: 12,
-          notes: 'Target 8–12 reps; rest 2 min',
-        ),
-        _ExercisePrescription(
-          exerciseId: 'seed-exercise-seated-dumbbell-shoulder-press',
-          targetReps: 12,
-          notes: 'Target 8–12 reps; rest 2 min',
-        ),
-        _ExercisePrescription(
-          exerciseId: 'seed-exercise-dumbbell-lateral-raise',
-          targetReps: 15,
-          notes: 'Target 12–15 reps; rest 60–90 sec',
-        ),
-        _ExercisePrescription(
-          exerciseId: 'seed-exercise-cable-triceps-pushdown',
-          targetReps: 15,
-          notes: 'Target 10–15 reps; rest 60–90 sec',
-        ),
-        _pushAExtension,
-      ],
-    ),
-    _workout(
-      id: 'seed-workout-pull-a',
-      name: 'Pull A',
-      prescriptions: const <_ExercisePrescription>[
-        _ExercisePrescription(
-          exerciseId: 'seed-exercise-barbell-bent-over-row',
-          targetReps: 10,
-          notes: 'Target 6–10 reps; rest 2–3 min',
-        ),
-        _ExercisePrescription(
-          exerciseId: 'seed-exercise-one-arm-dumbbell-row',
-          targetReps: 12,
-          notes: 'Target 8–12 reps per side; rest 90 sec',
-        ),
-        _ExercisePrescription(
-          exerciseId: 'seed-exercise-cable-lat-pulldown',
-          targetReps: 12,
-          notes: 'Target 8–12 reps; rest 2 min',
-        ),
-        _ExercisePrescription(
-          exerciseId: 'seed-exercise-dumbbell-rear-delt-fly',
-          targetReps: 15,
-          notes: 'Target 12–15 reps; rest 60–90 sec',
-        ),
-        _ExercisePrescription(
-          exerciseId: 'seed-exercise-dumbbell-hammer-curl',
-          targetReps: 15,
-          notes: 'Target 10–15 reps; rest 60–90 sec',
-        ),
-      ],
-    ),
-    _workout(
-      id: 'seed-workout-legs-a',
-      name: 'Legs A',
-      prescriptions: const <_ExercisePrescription>[
-        _ExercisePrescription(
-          exerciseId: 'seed-exercise-barbell-back-squat',
-          targetReps: 10,
-          notes: 'Target 6–10 reps; rest 2–3 min',
-        ),
-        _ExercisePrescription(
-          exerciseId: 'seed-exercise-romanian-deadlift',
-          targetReps: 12,
-          notes: 'Target 8–12 reps; rest 2–3 min',
-        ),
-        _ExercisePrescription(
-          exerciseId: 'seed-exercise-dumbbell-reverse-lunge',
-          targetReps: 12,
-          notes: 'Target 8–12 reps per leg; rest 90 sec',
-        ),
-        _ExercisePrescription(
-          exerciseId: 'seed-exercise-standing-dumbbell-calf-raise',
-          targetReps: 15,
-          notes: 'Target 12–15 reps; rest 60–90 sec',
-        ),
-        _ExercisePrescription(
-          exerciseId: 'seed-exercise-plank',
-          targetReps: 45,
-          notes: 'Hold for 30–45 seconds; rest 60 sec',
-        ),
-      ],
-    ),
-    _workout(
-      id: 'seed-workout-push-b',
-      name: 'Push B',
-      prescriptions: const <_ExercisePrescription>[
-        _ExercisePrescription(
-          exerciseId: 'seed-exercise-incline-barbell-bench-press',
-          targetReps: 10,
-          notes: 'Target 6–10 reps; rest 2–3 min',
-        ),
-        _ExercisePrescription(
-          exerciseId: 'seed-exercise-flat-dumbbell-bench-press',
-          targetReps: 12,
-          notes: 'Target 8–12 reps; rest 2 min',
-        ),
-        _ExercisePrescription(
-          exerciseId: 'seed-exercise-standing-barbell-overhead-press',
-          targetReps: 10,
-          notes: 'Target 6–10 reps; rest 2–3 min',
-        ),
-        _ExercisePrescription(
-          exerciseId: 'seed-exercise-dumbbell-lateral-raise',
-          targetReps: 15,
-          notes: 'Target 12–15 reps; rest 60–90 sec',
-        ),
-        _ExercisePrescription(
-          exerciseId: 'seed-exercise-overhead-dumbbell-triceps-extension',
-          targetReps: 15,
-          notes: 'Target 10–15 reps; rest 60–90 sec',
-        ),
-      ],
-    ),
-    _workout(
-      id: 'seed-workout-pull-b',
-      name: 'Pull B',
-      prescriptions: const <_ExercisePrescription>[
-        _ExercisePrescription(
-          exerciseId: 'seed-exercise-conventional-deadlift',
-          targetReps: 8,
-          notes: 'Target 5–8 reps; rest 3 min',
-        ),
-        _ExercisePrescription(
-          exerciseId: 'seed-exercise-chest-supported-dumbbell-row',
-          targetReps: 12,
-          notes: 'Target 8–12 reps; rest 2 min',
-        ),
-        _ExercisePrescription(
-          exerciseId: 'seed-exercise-cable-seated-row',
-          targetReps: 12,
-          notes: 'Target 8–12 reps; rest 2 min',
-        ),
-        _ExercisePrescription(
-          exerciseId: 'seed-exercise-cable-face-pull',
-          targetReps: 15,
-          notes: 'Target 12–15 reps; rest 60–90 sec',
-        ),
-        _ExercisePrescription(
-          exerciseId: 'seed-exercise-alternating-dumbbell-curl',
-          targetReps: 15,
-          notes: 'Target 10–15 reps per arm; rest 60–90 sec',
-        ),
-      ],
-    ),
-    _workout(
-      id: 'seed-workout-legs-b',
-      name: 'Legs B',
-      prescriptions: const <_ExercisePrescription>[
-        _ExercisePrescription(
-          exerciseId: 'seed-exercise-barbell-front-squat',
-          targetReps: 10,
-          notes: 'Target 6–10 reps; rest 2–3 min',
-        ),
-        _ExercisePrescription(
-          exerciseId: 'seed-exercise-barbell-hip-thrust',
-          targetReps: 12,
-          notes: 'Target 8–12 reps; rest 2 min',
-        ),
-        _ExercisePrescription(
-          exerciseId: 'seed-exercise-dumbbell-bulgarian-split-squat',
-          targetReps: 12,
-          notes: 'Target 8–12 reps per leg; rest 90 sec',
-        ),
-        _ExercisePrescription(
-          exerciseId: 'seed-exercise-standing-dumbbell-calf-raise',
-          targetReps: 15,
-          notes: 'Target 12–15 reps; rest 60–90 sec',
-        ),
-        _ExercisePrescription(
-          exerciseId: 'seed-exercise-lying-leg-raise',
-          targetReps: 15,
-          notes: 'Target 10–15 reps; rest 60 sec',
-        ),
-      ],
-    ),
-  ];
-
-  static final List<Workout> _crossFitWorkouts = <Workout>[
-    _crossFitWorkout(
-      id: 'seed-workout-crossfit-a',
-      name: 'CrossFit A',
-      prescriptions: const <_ExercisePrescription>[
-        _ExercisePrescription(
-            exerciseId: 'crossfit-push-press',
-            targetReps: 5,
-            setCount: 5,
-            notes: '1-second overhead lockout'),
-        _ExercisePrescription(
-            exerciseId: 'crossfit-band-chest-to-bar',
-            targetReps: 8,
-            setCount: 5,
-            notes: 'Band-assisted; use a controlled chest-to-bar pull'),
-      ],
-      conditioningPlan: ConditioningPlan(
-        format: ConditioningFormat.roundsForTime,
-        title: '4 rounds for time',
-        prescribedRounds: 4,
-        instructions:
-            '20 Step-ups\n200 m Run\n10 Dumbbell Clean & Press\n5 Scaled Wall Walks',
-        movements: const <ConditioningMovement>[
-          ConditioningMovement(
-              id: 'step-ups',
-              name: 'Step-ups',
-              prescribedReps: 20,
-              isBodyweight: true),
-          ConditioningMovement(
-              id: 'run',
-              name: 'Run',
-              prescribedDistance: 200,
-              distanceUnit: DistanceUnit.metres,
-              isBodyweight: true),
-          ConditioningMovement(
-              id: 'db-clean-press',
-              name: 'Dumbbell Clean & Press',
-              prescribedReps: 10),
-          ConditioningMovement(
-              id: 'wall-walk',
-              name: 'Scaled Wall Walk',
-              prescribedReps: 5,
-              isBodyweight: true),
-        ],
-      ),
-    ),
-    _crossFitWorkout(
-      id: 'seed-workout-crossfit-b',
-      name: 'CrossFit B',
+  static final List<Workout> _hybridWorkouts = <Workout>[
+    _hybridWorkout(
+      id: 'seed-workout-push-a-hybrid',
+      name: 'Push A Hybrid',
       warmUp:
-          '2 rounds:\n10 Air Squats\n8 Alternating Reverse Lunges\n10 Light Dumbbell Deadlifts\n20 sec Plank\nThen approximately 60 sec easy jog/walk',
+          'About 5 min: easy walk or jog, shoulder circles, band pull-aparts, and two light bench-press ramp-up sets.',
       prescriptions: const <_ExercisePrescription>[
+        _ExercisePrescription('seed-exercise-barbell-bench-press', 8, 4,
+            'Target 6–8 reps; rest about 90 sec'),
+        _ExercisePrescription('seed-exercise-incline-dumbbell-press', 10, 3,
+            'Target 8–10 reps; rest about 75 sec'),
+        _ExercisePrescription('seed-exercise-seated-dumbbell-shoulder-press',
+            10, 3, 'Target 8–10 reps; rest about 75 sec'),
+        _ExercisePrescription('seed-exercise-dumbbell-lateral-raise', 15, 3,
+            'Target 12–15 reps; rest about 45 sec'),
         _ExercisePrescription(
-            exerciseId: 'seed-exercise-barbell-back-squat',
-            targetReps: 5,
-            setCount: 5,
-            notes: 'Rest 90–120 sec'),
+            'seed-exercise-overhead-dumbbell-triceps-extension',
+            15,
+            3,
+            'Target 10–15 reps; rest about 45 sec'),
       ],
-      conditioningPlan: ConditioningPlan(
-        format: ConditioningFormat.roundsForTime,
-        title: '4 rounds for time',
-        prescribedRounds: 4,
-        instructions:
-            '12 Alternating Goblet Reverse Lunges (6 each leg)\n15 Dumbbell Deadlifts\n12 Step-ups (6 each leg)\n200 m Run\nScaling: replace step-ups with 15 Air Squats if no safe platform is available.',
-        movements: const <ConditioningMovement>[
-          ConditioningMovement(
-              id: 'goblet-reverse-lunge',
-              name: 'Goblet Reverse Lunge',
-              prescribedReps: 12),
-          ConditioningMovement(
-              id: 'dumbbell-deadlift',
-              name: 'Dumbbell Deadlift',
-              prescribedReps: 15,
-              implementCount: 2),
-          ConditioningMovement(
-              id: 'step-ups',
-              name: 'Step-ups',
-              prescribedReps: 12,
-              isBodyweight: true),
-          ConditioningMovement(
-              id: 'run',
-              name: 'Run',
-              prescribedDistance: 200,
-              distanceUnit: DistanceUnit.metres,
-              isBodyweight: true),
-        ],
-      ),
+      conditioning: _pushAConditioning(),
     ),
-    _crossFitWorkout(
-      id: 'seed-workout-crossfit-c',
-      name: 'CrossFit C',
+    _hybridWorkout(
+      id: 'seed-workout-pull-a-hybrid',
+      name: 'Pull A Hybrid',
+      warmUp:
+          'About 5 min: easy walk or jog, band rows, shoulder circles, and two light row ramp-up sets.',
       prescriptions: const <_ExercisePrescription>[
-        _ExercisePrescription(
-            exerciseId: 'crossfit-barbell-deadlift',
-            targetReps: 5,
-            setCount: 5,
-            notes: 'Strength: 5 × 5'),
+        _ExercisePrescription('seed-exercise-barbell-bent-over-row', 8, 4,
+            'Target 6–8 reps; rest about 90 sec'),
+        _ExercisePrescription('seed-exercise-cable-lat-pulldown', 10, 3,
+            'Target 8–10 reps; rest about 75 sec'),
+        _ExercisePrescription('seed-exercise-one-arm-dumbbell-row', 10, 3,
+            'Target 8–10 reps per side; rest about 75 sec'),
+        _ExercisePrescription('seed-exercise-dumbbell-rear-delt-fly', 15, 3,
+            'Target 12–15 reps; rest about 45 sec'),
+        _ExercisePrescription('seed-exercise-dumbbell-hammer-curl', 12, 3,
+            'Target 10–12 reps; rest about 45 sec'),
       ],
-      conditioningPlan: ConditioningPlan(
-        format: ConditioningFormat.amrap,
-        title: '12-minute AMRAP',
-        durationMinutes: 12,
-        instructions:
-            '8 Dumbbell Romanian Deadlifts\n10 Push-ups\n12 Air Squats\n200 m Run\nScaling: elevated/incline push-ups are allowed.',
-        movements: const <ConditioningMovement>[
-          ConditioningMovement(
-              id: 'db-rdl',
-              name: 'Dumbbell Romanian Deadlift',
-              prescribedReps: 8,
-              implementCount: 2),
-          ConditioningMovement(
-              id: 'push-up',
-              name: 'Push-up',
-              prescribedReps: 10,
-              isBodyweight: true),
-          ConditioningMovement(
-              id: 'air-squat',
-              name: 'Air Squat',
-              prescribedReps: 12,
-              isBodyweight: true),
-          ConditioningMovement(
-              id: 'run',
-              name: 'Run',
-              prescribedDistance: 200,
-              distanceUnit: DistanceUnit.metres,
-              isBodyweight: true),
-        ],
-      ),
+      conditioning: _conditioning(<ConditioningMovement>[
+        _bodyweight('step-ups', 'Step-ups', 12),
+        _bodyweight('sit-ups', 'Sit-ups', 12),
+        _loaded('kb-swings', 'Kettlebell Swings', 10, 10),
+        _run(),
+      ]),
     ),
-    _crossFitWorkout(
-      id: 'seed-workout-crossfit-d',
-      name: 'CrossFit D',
+    _hybridWorkout(
+      id: 'seed-workout-legs-a-hybrid',
+      name: 'Legs A Hybrid',
+      warmUp:
+          'About 5 min: easy walk, bodyweight squats, hip hinges, and two light squat ramp-up sets.',
       prescriptions: const <_ExercisePrescription>[
+        _ExercisePrescription('seed-exercise-barbell-back-squat', 8, 4,
+            'Target 6–8 reps; rest about 90 sec'),
+        _ExercisePrescription('seed-exercise-romanian-deadlift', 10, 3,
+            'Target 8–10 reps; rest about 75 sec'),
+        _ExercisePrescription('seed-exercise-dumbbell-reverse-lunge', 10, 3,
+            'Target 8–10 reps per leg; rest about 75 sec'),
+        _ExercisePrescription('seed-exercise-standing-dumbbell-calf-raise', 15,
+            3, 'Target 12–15 reps; rest about 45 sec'),
         _ExercisePrescription(
-            exerciseId: 'crossfit-band-pull-up',
-            targetReps: 7,
-            setCount: 5,
-            notes: 'Target 6–8 reps'),
-        _ExercisePrescription(
-            exerciseId: 'crossfit-db-bench-press',
-            targetReps: 8,
-            setCount: 4,
-            notes: 'Strength: 4 × 8'),
+            'seed-exercise-plank', 45, 3, 'Hold 30–45 sec; rest about 45 sec'),
       ],
-      conditioningPlan: ConditioningPlan(
-        format: ConditioningFormat.roundsForTime,
-        title: '4 rounds for time',
-        prescribedRounds: 4,
-        instructions:
-            '10 Dumbbell Rows (5 each side)\n10 Push-ups\n12 Dumbbell Goblet Squats\n200 m Run',
-        movements: const <ConditioningMovement>[
-          ConditioningMovement(
-              id: 'db-row', name: 'Dumbbell Row', prescribedReps: 10),
-          ConditioningMovement(
-              id: 'push-up',
-              name: 'Push-up',
-              prescribedReps: 10,
-              isBodyweight: true),
-          ConditioningMovement(
-              id: 'db-goblet-squat',
-              name: 'Dumbbell Goblet Squat',
-              prescribedReps: 12),
-          ConditioningMovement(
-              id: 'run',
-              name: 'Run',
-              prescribedDistance: 200,
-              distanceUnit: DistanceUnit.metres,
-              isBodyweight: true),
-        ],
-      ),
+      conditioning: _conditioning(<ConditioningMovement>[
+        _bodyweight('push-ups', 'Push-ups', 10),
+        _loaded('db-floor-press', 'Dumbbell Floor Press', 10, null),
+        _bodyweight('sit-ups', 'Sit-ups', 12),
+        _run(),
+      ]),
     ),
-    _crossFitWorkout(
-      id: 'seed-workout-crossfit-e',
-      name: 'CrossFit E',
+    _hybridWorkout(
+      id: 'seed-workout-push-b-hybrid',
+      name: 'Push B Hybrid',
+      warmUp:
+          'About 5 min: easy walk or jog, shoulder mobility, band pull-aparts, and two light press ramp-up sets.',
       prescriptions: const <_ExercisePrescription>[
+        _ExercisePrescription('seed-exercise-incline-barbell-bench-press', 8, 4,
+            'Target 6–8 reps; rest about 90 sec'),
+        _ExercisePrescription('seed-exercise-flat-dumbbell-bench-press', 10, 3,
+            'Target 8–10 reps; rest about 75 sec'),
+        _ExercisePrescription('seed-exercise-standing-barbell-overhead-press',
+            8, 3, 'Target 6–8 reps; rest about 75 sec'),
+        _ExercisePrescription('seed-exercise-dumbbell-lateral-raise', 15, 3,
+            'Target 12–15 reps; rest about 45 sec'),
         _ExercisePrescription(
-            exerciseId: 'crossfit-db-clean',
-            targetReps: 5,
-            setCount: 5,
-            notes:
-                '5 each side; keep load deliberately light and technique-focused.'),
+            'seed-exercise-overhead-dumbbell-triceps-extension',
+            12,
+            3,
+            'Target 10–15 reps; rest about 45 sec'),
       ],
-      conditioningPlan: ConditioningPlan(
-        format: ConditioningFormat.emom,
-        title: '15-minute EMOM',
-        durationMinutes: 15,
-        instructions:
-            'Minute 1: 10 Dumbbell Goblet Squats\nMinute 2: 8 Dumbbell Clean & Press (4 each side)\nMinute 3: 40 sec brisk run / shuttle / fast walk\nRepeat for 5 cycles.',
-        movements: const <ConditioningMovement>[
-          ConditioningMovement(
-              id: 'db-goblet-squat',
-              name: 'Dumbbell Goblet Squat',
-              prescribedReps: 10),
-          ConditioningMovement(
-              id: 'db-clean-press',
-              name: 'Dumbbell Clean & Press',
-              prescribedReps: 8),
-          ConditioningMovement(
-              id: 'brisk-run',
-              name: 'Brisk run / shuttle / fast walk',
-              notes: '40 sec',
-              isBodyweight: true),
-        ],
-      ),
+      conditioning: _conditioning(<ConditioningMovement>[
+        _loaded('goblet-squat', 'Goblet Squat', 12, 10),
+        _bodyweight('step-ups', 'Step-ups', 12),
+        _bodyweight('sit-ups', 'Sit-ups', 12),
+        _run(),
+      ]),
     ),
-    _crossFitWorkout(
-      id: 'seed-workout-crossfit-f',
-      name: 'CrossFit F',
+    _hybridWorkout(
+      id: 'seed-workout-pull-b-hybrid',
+      name: 'Pull B Hybrid',
+      warmUp:
+          'About 5 min: easy walk, hip hinges, band rows, and several light deadlift ramp-up sets.',
       prescriptions: const <_ExercisePrescription>[
-        _ExercisePrescription(
-            exerciseId: 'crossfit-goblet-squat',
-            targetReps: 10,
-            setCount: 4,
-            notes: 'Strength: 4 × 10'),
+        _ExercisePrescription('seed-exercise-conventional-deadlift', 6, 3,
+            'Target 5–6 reps; rest about 90 sec'),
+        _ExercisePrescription('seed-exercise-chest-supported-dumbbell-row', 10,
+            3, 'Target 8–10 reps; rest about 75 sec'),
+        _ExercisePrescription('seed-exercise-cable-seated-row', 10, 3,
+            'Target 8–10 reps; rest about 75 sec'),
+        _ExercisePrescription('seed-exercise-cable-face-pull', 15, 3,
+            'Target 12–15 reps; rest about 45 sec'),
+        _ExercisePrescription('seed-exercise-alternating-dumbbell-curl', 12, 3,
+            'Target 10–12 reps; rest about 45 sec'),
       ],
-      conditioningPlan: ConditioningPlan(
-        format: ConditioningFormat.amrap,
-        title: '20-minute AMRAP',
-        durationMinutes: 20,
-        instructions:
-            '200 m Run\n10 Dumbbell Deadlifts\n10 Step-ups\n8 Dumbbell Push Press\n10 Sit-ups\nScaling: replace step-ups with 15 Air Squats if no safe platform is available.',
-        movements: const <ConditioningMovement>[
-          ConditioningMovement(
-              id: 'run',
-              name: 'Run',
-              prescribedDistance: 200,
-              distanceUnit: DistanceUnit.metres,
-              isBodyweight: true),
-          ConditioningMovement(
-              id: 'dumbbell-deadlift',
-              name: 'Dumbbell Deadlift',
-              prescribedReps: 10,
-              implementCount: 2),
-          ConditioningMovement(
-              id: 'step-ups',
-              name: 'Step-ups',
-              prescribedReps: 10,
-              isBodyweight: true),
-          ConditioningMovement(
-              id: 'db-push-press',
-              name: 'Dumbbell Push Press',
-              prescribedReps: 8),
-          ConditioningMovement(
-              id: 'sit-up',
-              name: 'Sit-up',
-              prescribedReps: 10,
-              isBodyweight: true),
-        ],
-      ),
+      conditioning: _conditioning(<ConditioningMovement>[
+        _bodyweight('push-ups', 'Push-ups', 10),
+        _loaded('goblet-squat', 'Goblet Squat', 10, 10),
+        const ConditioningMovement(
+            id: 'plank', name: 'Plank', notes: '30 sec', isBodyweight: true),
+        _run(),
+      ]),
+    ),
+    _hybridWorkout(
+      id: 'seed-workout-legs-b-hybrid',
+      name: 'Legs B Hybrid',
+      warmUp:
+          'About 5 min: easy walk, bodyweight lunges, hip hinges, and two light front-squat ramp-up sets.',
+      prescriptions: const <_ExercisePrescription>[
+        _ExercisePrescription('seed-exercise-barbell-front-squat', 8, 4,
+            'Target 6–8 reps; rest about 90 sec'),
+        _ExercisePrescription('seed-exercise-barbell-hip-thrust', 10, 3,
+            'Target 8–10 reps; rest about 75 sec'),
+        _ExercisePrescription('seed-exercise-dumbbell-bulgarian-split-squat',
+            10, 3, 'Target 8–10 reps per leg; rest about 75 sec'),
+        _ExercisePrescription('seed-exercise-standing-dumbbell-calf-raise', 15,
+            3, 'Target 12–15 reps; rest about 45 sec'),
+        _ExercisePrescription('seed-exercise-lying-leg-raise', 12, 3,
+            'Target 10–15 reps; rest about 45 sec'),
+      ],
+      conditioning: _conditioning(<ConditioningMovement>[
+        _loaded('db-row', 'Dumbbell Row', 10, null),
+        _bodyweight('push-ups', 'Push-ups', 10),
+        _bodyweight('sit-ups', 'Sit-ups', 12),
+        _run(),
+      ]),
     ),
   ];
 
-  static final List<Workout> _allWorkouts = <Workout>[
-    ..._workouts,
-    ..._crossFitWorkouts,
-  ];
+  static Exercise _exercise(
+    String id,
+    String name,
+    MuscleGroup muscleGroup,
+    Equipment equipment, {
+    ExerciseCategory category = ExerciseCategory.strength,
+  }) {
+    return Exercise(
+      id: id,
+      name: name,
+      category: category,
+      primaryMuscleGroup: muscleGroup,
+      equipment: equipment,
+    );
+  }
 
-  static const _ExercisePrescription _pushAExtension = _ExercisePrescription(
-    exerciseId: 'seed-exercise-overhead-rope-triceps-extension',
-    targetReps: 15,
-    setCount: 1,
-    notes: 'Target 10-15 reps; rest 60-90 sec',
-  );
-
-  static Workout _workout({
+  static Workout _hybridWorkout({
     required String id,
     required String name,
+    required String warmUp,
     required List<_ExercisePrescription> prescriptions,
+    required ConditioningPlan conditioning,
   }) {
     return Workout(
       id: id,
       name: name,
       scheduledDate: DateTime.utc(2000),
       status: WorkoutStatus.planned,
+      track: WorkoutTrack.hybrid,
+      warmUp: warmUp,
+      conditioningPlan: conditioning,
+      sessionDurationTarget: 'Up to about 60 min',
       exerciseIds: prescriptions
-          .map((_ExercisePrescription prescription) => prescription.exerciseId)
+          .map((_ExercisePrescription value) => value.exerciseId)
           .toList(growable: false),
       sets: <WorkoutSet>[
         for (final _ExercisePrescription prescription in prescriptions)
@@ -982,37 +363,87 @@ class WorkoutSeedService {
     );
   }
 
-  static Workout _crossFitWorkout({
-    required String id,
-    required String name,
-    required List<_ExercisePrescription> prescriptions,
-    required ConditioningPlan conditioningPlan,
-    String? warmUp,
-  }) {
-    final Workout baseWorkout = _workout(
+  static ConditioningPlan _pushAConditioning() {
+    return ConditioningPlan(
+      format: ConditioningFormat.roundsForTime,
+      title: '4 rounds for time',
+      prescribedRounds: 4,
+      instructions:
+          '12 Kettlebell Swings\n10 Alternating Kettlebell Reverse Lunges (5 each leg)\n10 Step-ups (5 each leg)\n200 m Run\nStart kettlebell load at 10 kg and keep technique controlled.',
+      movements: <ConditioningMovement>[
+        _loaded('kettlebell-swings', 'Kettlebell Swings', 12, 10),
+        _loaded('kettlebell-reverse-lunges',
+            'Alternating Kettlebell Reverse Lunges', 10, 10),
+        _bodyweight('step-ups', 'Step-ups', 10),
+        _run(),
+      ],
+    );
+  }
+
+  static ConditioningPlan _conditioning(List<ConditioningMovement> movements) {
+    final String instructions = movements.map((ConditioningMovement movement) {
+      if (movement.prescribedReps != null) {
+        return '${movement.prescribedReps} ${movement.name}';
+      }
+      if (movement.prescribedDistance != null) {
+        return '${movement.prescribedDistance!.toStringAsFixed(0)} m '
+            '${movement.name}';
+      }
+      return '${movement.name}${movement.notes == null ? '' : ': ${movement.notes}'}';
+    }).join('\n');
+    return ConditioningPlan(
+      format: ConditioningFormat.roundsForTime,
+      title: '4 rounds for time',
+      prescribedRounds: 4,
+      instructions: instructions,
+      movements: movements,
+    );
+  }
+
+  static ConditioningMovement _bodyweight(String id, String name, int reps) {
+    return ConditioningMovement(
       id: id,
       name: name,
-      prescriptions: prescriptions,
+      prescribedReps: reps,
+      isBodyweight: true,
     );
-    return baseWorkout.copyWith(
-      track: WorkoutTrack.crossFit,
-      warmUp: warmUp,
-      conditioningPlan: conditioningPlan,
-      sessionDurationTarget: '35–45 min',
+  }
+
+  static ConditioningMovement _loaded(
+    String id,
+    String name,
+    int reps,
+    double? load,
+  ) {
+    return ConditioningMovement(
+      id: id,
+      name: name,
+      prescribedReps: reps,
+      prescribedLoad: load,
+    );
+  }
+
+  static ConditioningMovement _run() {
+    return const ConditioningMovement(
+      id: 'run',
+      name: 'Run',
+      prescribedDistance: 200,
+      distanceUnit: DistanceUnit.metres,
+      isBodyweight: true,
     );
   }
 }
 
 class _ExercisePrescription {
-  const _ExercisePrescription({
-    required this.exerciseId,
-    required this.targetReps,
-    required this.notes,
-    this.setCount = 3,
-  });
+  const _ExercisePrescription(
+    this.exerciseId,
+    this.targetReps,
+    this.setCount,
+    this.notes,
+  );
 
   final String exerciseId;
   final int targetReps;
-  final String notes;
   final int setCount;
+  final String notes;
 }

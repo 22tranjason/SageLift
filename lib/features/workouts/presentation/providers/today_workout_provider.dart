@@ -25,7 +25,7 @@ final StateProvider<int> workoutDataRevisionProvider = StateProvider<int>(
   (Ref ref) => 0,
 );
 
-/// Loads the active or next planned programme workout for the Today screen.
+/// Loads the active or next Hybrid programme workout for the Today screen.
 final FutureProvider<TodayWorkout?> todayWorkoutProvider =
     FutureProvider<TodayWorkout?>((Ref ref) async {
   ref.watch(workoutDataRevisionProvider);
@@ -38,7 +38,7 @@ final FutureProvider<TodayWorkout?> todayWorkoutProvider =
   final List<Workout> workouts = await workoutRepository.getAll();
   final Workout? workout = WorkoutProgram.nextIncompleteWorkout(
     workouts,
-    track: WorkoutTrack.strengthPpl,
+    track: WorkoutTrack.hybrid,
   );
   if (workout == null) return null;
   final List<Exercise> exercises = <Exercise>[];
@@ -52,29 +52,8 @@ final FutureProvider<TodayWorkout?> todayWorkoutProvider =
     isRecommended: workout.status != WorkoutStatus.inProgress,
     recommendedWorkoutName: WorkoutProgram.recommendedNextWorkoutName(
       workouts,
-      track: WorkoutTrack.strengthPpl,
+      track: WorkoutTrack.hybrid,
     ),
-  );
-});
-
-/// Loads the active or next planned CrossFit workout independently of PPL.
-final FutureProvider<TodayWorkout?> crossFitTodayWorkoutProvider =
-    FutureProvider<TodayWorkout?>((Ref ref) async {
-  ref.watch(workoutDataRevisionProvider);
-  final WorkoutRepository workoutRepository =
-      ref.watch(workoutRepositoryProvider);
-  final ExerciseRepository exerciseRepository =
-      ref.watch(exerciseRepositoryProvider);
-  final List<Workout> workouts = await workoutRepository.getAll();
-  final Workout? workout = WorkoutProgram.nextIncompleteWorkout(
-    workouts,
-    track: WorkoutTrack.crossFit,
-  );
-  if (workout == null) return null;
-  return _todayWorkoutFor(
-    workout: workout,
-    workouts: workouts,
-    exerciseRepository: exerciseRepository,
   );
 });
 

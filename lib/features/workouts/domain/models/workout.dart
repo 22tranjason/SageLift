@@ -8,6 +8,9 @@ enum WorkoutTrack {
 
   /// Jason's repeating CrossFit programme.
   crossFit,
+
+  /// SageLift's unified future strength-and-conditioning programme.
+  hybrid,
 }
 
 /// The lifecycle state of a scheduled workout.

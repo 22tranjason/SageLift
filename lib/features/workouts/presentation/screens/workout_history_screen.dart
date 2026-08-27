@@ -48,11 +48,7 @@ class WorkoutHistoryScreen extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
                         const SizedBox(height: 4),
-                        Text(
-                          item.workout.track == WorkoutTrack.crossFit
-                              ? 'CrossFit'
-                              : 'Strength — PPL',
-                        ),
+                        Text(_trackLabel(item.workout.track)),
                         Text(_dateLabel(item.workout.completedAt)),
                         Text(
                             'Duration: ${_durationLabel(item.summary.duration)}'),
@@ -107,5 +103,16 @@ class WorkoutHistoryScreen extends ConsumerWidget {
             '${(result.completionTime!.inSeconds % 60).toString().padLeft(2, '0')}';
     final String scaling = result.scaling == null ? '' : ' • ${result.scaling}';
     return '$rounds$time$scaling';
+  }
+}
+
+String _trackLabel(WorkoutTrack track) {
+  switch (track) {
+    case WorkoutTrack.strengthPpl:
+      return 'Strength — PPL';
+    case WorkoutTrack.crossFit:
+      return 'CrossFit';
+    case WorkoutTrack.hybrid:
+      return 'Hybrid PPL';
   }
 }

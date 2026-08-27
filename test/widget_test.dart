@@ -33,9 +33,10 @@ void main() {
     );
     final Workout workout = Workout(
       id: 'seed-workout-push-a',
-      name: 'Push A',
+      name: 'Push A Hybrid',
       scheduledDate: DateTime.utc(2000),
       status: WorkoutStatus.planned,
+      track: WorkoutTrack.hybrid,
       exerciseIds: <String>[benchPress.id, inclinePress.id],
       sets: <WorkoutSet>[
         WorkoutSet(
@@ -70,11 +71,20 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Good Morning Jason'), findsOneWidget);
-    expect(find.text('Push A'), findsOneWidget);
+    expect(find.text('Push A Hybrid'), findsOneWidget);
     expect(find.text('Barbell Bench Press'), findsOneWidget);
     expect(find.text('Incline Dumbbell Press'), findsOneWidget);
     expect(find.text('Start Workout'), findsOneWidget);
     expect(find.text('Last Workout'), findsNothing);
+
+    await tester.tap(find.text('Choose Workout'));
+    await tester.pumpAndSettle();
+    expect(find.text('Push A Hybrid'), findsNWidgets(2));
+    expect(find.text('Legs B Hybrid'), findsOneWidget);
+    expect(find.text('Push A'), findsNothing);
+    expect(find.text('CrossFit A'), findsNothing);
+    await tester.tapAt(const Offset(8, 8));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const ValueKey<String>('water-target')));
     await tester.pumpAndSettle();
@@ -137,9 +147,10 @@ void main() {
     );
     final Workout workout = Workout(
       id: 'push-a',
-      name: 'Push A',
+      name: 'Push A Hybrid',
       scheduledDate: DateTime.utc(2000),
       status: WorkoutStatus.planned,
+      track: WorkoutTrack.hybrid,
       exerciseIds: <String>[benchPress.id, inclinePress.id],
       sets: <WorkoutSet>[
         WorkoutSet(
@@ -291,9 +302,10 @@ void main() {
     );
     final Workout workout = Workout(
       id: 'completion-push-a',
-      name: 'Push A',
+      name: 'Push A Hybrid',
       scheduledDate: DateTime.utc(2026, 7, 30),
       status: WorkoutStatus.planned,
+      track: WorkoutTrack.hybrid,
       exerciseIds: <String>[benchPress.id, row.id],
       sets: <WorkoutSet>[
         WorkoutSet(
@@ -314,9 +326,10 @@ void main() {
     );
     final Workout nextWorkout = Workout(
       id: 'completion-pull-a',
-      name: 'Pull A',
+      name: 'Pull A Hybrid',
       scheduledDate: DateTime.utc(2026, 7, 31),
       status: WorkoutStatus.planned,
+      track: WorkoutTrack.hybrid,
       exerciseIds: <String>[row.id],
       sets: <WorkoutSet>[
         WorkoutSet(
@@ -425,9 +438,9 @@ void main() {
 
     expect(find.text('Today'), findsOneWidget);
     expect(find.text('Next Workout'), findsOneWidget);
-    expect(find.text('Pull A'), findsOneWidget);
+    expect(find.text('Pull A Hybrid'), findsOneWidget);
     expect(find.text('Last Workout'), findsOneWidget);
-    expect(find.text('Push A'), findsOneWidget);
+    expect(find.text('Push A Hybrid'), findsOneWidget);
     expect(find.text('Completed today'), findsOneWidget);
     expect(find.text('Start Workout'), findsOneWidget);
   });
@@ -549,9 +562,10 @@ void main() {
     );
     final Workout activeWorkout = Workout(
       id: 'active-workout',
-      name: 'Push A',
+      name: 'Push A Hybrid',
       scheduledDate: DateTime.utc(2026, 7, 30),
       status: WorkoutStatus.planned,
+      track: WorkoutTrack.hybrid,
       exerciseIds: <String>[benchPress.id],
       sets: <WorkoutSet>[
         WorkoutSet(

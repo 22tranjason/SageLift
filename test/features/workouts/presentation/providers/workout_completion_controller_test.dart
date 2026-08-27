@@ -9,27 +9,27 @@ import 'package:sagelift/features/workouts/presentation/providers/workout_set_pr
 void main() {
   test('completion persists through a separate repository read', () async {
     final _MemoryWorkoutRepository repository = _MemoryWorkoutRepository(
-      <Workout>[_workout('Pull A', WorkoutStatus.inProgress)],
+      <Workout>[_workout('Pull A Hybrid', WorkoutStatus.inProgress)],
     );
     final WorkoutCompletionController controller = _controller(repository);
 
-    final Workout? completed = await controller.finishWorkout('pull-a');
+    final Workout? completed = await controller.finishWorkout('pull-a-hybrid');
 
     expect(completed?.status, WorkoutStatus.completed);
-    expect((await repository.getById('pull-a'))?.completedAt, isNotNull);
-    expect((await repository.getById('pull-a'))?.name, 'Pull A');
+    expect((await repository.getById('pull-a-hybrid'))?.completedAt, isNotNull);
+    expect((await repository.getById('pull-a-hybrid'))?.name, 'Pull A Hybrid');
   });
 
   test('duplicate Finish taps create one completion', () async {
     final _MemoryWorkoutRepository repository = _MemoryWorkoutRepository(
-      <Workout>[_workout('Push A', WorkoutStatus.inProgress)],
+      <Workout>[_workout('Push A Hybrid', WorkoutStatus.inProgress)],
     );
     final WorkoutCompletionController controller = _controller(repository);
 
     final List<Workout?> results = await Future.wait<Workout?>(
       <Future<Workout?>>[
-        controller.finishWorkout('push-a'),
-        controller.finishWorkout('push-a'),
+        controller.finishWorkout('push-a-hybrid'),
+        controller.finishWorkout('push-a-hybrid'),
       ],
     );
 
@@ -39,15 +39,20 @@ void main() {
 
   test('failed save does not report a successful completion', () async {
     final _MemoryWorkoutRepository repository = _MemoryWorkoutRepository(
-      <Workout>[_workout('Push A', WorkoutStatus.inProgress)],
+      <Workout>[_workout('Push A Hybrid', WorkoutStatus.inProgress)],
       failCompletedSaves: true,
     );
     final WorkoutCompletionController controller = _controller(repository);
 
-    await expectLater(controller.finishWorkout('push-a'), throwsStateError);
+    await expectLater(
+      controller.finishWorkout('push-a-hybrid'),
+      throwsStateError,
+    );
 
     expect(
-        (await repository.getById('push-a'))?.status, WorkoutStatus.inProgress);
+      (await repository.getById('push-a-hybrid'))?.status,
+      WorkoutStatus.inProgress,
+    );
   });
 
   test('manual selection starts each program workout without completing others',
@@ -77,81 +82,21 @@ void main() {
     );
     final WorkoutCompletionController controller = _controller(repository);
 
-    final Workout? selected = await controller.startSelectedWorkout('Pull B');
+    final Workout? selected =
+        await controller.startSelectedWorkout('Pull B Hybrid');
     await controller.finishWorkout(selected!.id);
 
     expect(
       WorkoutProgram.nextIncompleteWorkout(await repository.getAll())?.name,
-      'Legs B',
-    );
-  });
-
-  test('manual CrossFit selection starts its independent track', () async {
-    final _MemoryWorkoutRepository repository = _MemoryWorkoutRepository(
-      <Workout>[..._programTemplates(), ..._crossFitTemplates()],
-    );
-    final WorkoutCompletionController controller = _controller(repository);
-
-    final Workout? selected =
-        await controller.startSelectedWorkout('CrossFit B');
-
-    expect(selected?.track, WorkoutTrack.crossFit);
-    expect(selected?.status, WorkoutStatus.inProgress);
-    expect(
-      WorkoutProgram.recommendedNextWorkoutName(await repository.getAll()),
-      'Push A',
-    );
-  });
-
-  test('CrossFit completion advances only CrossFit', () async {
-    final _MemoryWorkoutRepository repository = _MemoryWorkoutRepository(
-      <Workout>[..._programTemplates(), ..._crossFitTemplates()],
-    );
-    final WorkoutCompletionController controller = _controller(repository);
-    final Workout? selected =
-        await controller.startSelectedWorkout('CrossFit B');
-
-    await controller.finishWorkout(selected!.id);
-
-    final List<Workout> workouts = await repository.getAll();
-    expect(WorkoutProgram.recommendedNextWorkoutName(workouts), 'Push A');
-    expect(
-      WorkoutProgram.recommendedNextWorkoutName(
-        workouts,
-        track: WorkoutTrack.crossFit,
-      ),
-      'CrossFit C',
-    );
-  });
-
-  test('deleting CrossFit history recalculates only CrossFit', () async {
-    final Workout ppl = _completed('Pull A', DateTime.utc(2026, 8, 1, 7));
-    final Workout crossFit = _completed(
-      'CrossFit B',
-      DateTime.utc(2026, 8, 2, 7),
-      track: WorkoutTrack.crossFit,
-    );
-    final _MemoryWorkoutRepository repository = _MemoryWorkoutRepository(
-      <Workout>[..._programTemplates(), ..._crossFitTemplates(), ppl, crossFit],
-    );
-    final WorkoutCompletionController controller = _controller(repository);
-
-    await controller.deleteCompletedWorkout(crossFit.id);
-
-    final List<Workout> workouts = await repository.getAll();
-    expect(WorkoutProgram.recommendedNextWorkoutName(workouts), 'Legs A');
-    expect(
-      WorkoutProgram.recommendedNextWorkoutName(
-        workouts,
-        track: WorkoutTrack.crossFit,
-      ),
-      'CrossFit A',
+      'Legs B Hybrid',
     );
   });
 
   test('deleting latest history recalculates the next workout', () async {
-    final Workout pushA = _completed('Push A', DateTime.utc(2026, 8, 1, 7));
-    final Workout pullA = _completed('Pull A', DateTime.utc(2026, 8, 2, 7));
+    final Workout pushA =
+        _completed('Push A Hybrid', DateTime.utc(2026, 8, 1, 7));
+    final Workout pullA =
+        _completed('Pull A Hybrid', DateTime.utc(2026, 8, 2, 7));
     final _MemoryWorkoutRepository repository = _MemoryWorkoutRepository(
       <Workout>[..._programTemplates(), pushA, pullA],
     );
@@ -162,14 +107,17 @@ void main() {
     expect(await repository.getById(pullA.id), isNull);
     expect(
       WorkoutProgram.nextIncompleteWorkout(await repository.getAll())?.name,
-      'Pull A',
+      'Pull A Hybrid',
     );
   });
 
   test('deleting a middle history record preserves other history', () async {
-    final Workout pushA = _completed('Push A', DateTime.utc(2026, 8, 1, 7));
-    final Workout pullA = _completed('Pull A', DateTime.utc(2026, 8, 2, 7));
-    final Workout legsA = _completed('Legs A', DateTime.utc(2026, 8, 3, 7));
+    final Workout pushA =
+        _completed('Push A Hybrid', DateTime.utc(2026, 8, 1, 7));
+    final Workout pullA =
+        _completed('Pull A Hybrid', DateTime.utc(2026, 8, 2, 7));
+    final Workout legsA =
+        _completed('Legs A Hybrid', DateTime.utc(2026, 8, 3, 7));
     final _MemoryWorkoutRepository repository = _MemoryWorkoutRepository(
       <Workout>[..._programTemplates(), pushA, pullA, legsA],
     );
@@ -182,13 +130,15 @@ void main() {
     expect(await repository.getById(pullA.id), isNull);
     expect(
       WorkoutProgram.recommendedNextWorkoutName(await repository.getAll()),
-      'Push B',
+      'Push B Hybrid',
     );
   });
 
-  test('deleting all history returns the program to Push A', () async {
-    final Workout pushA = _completed('Push A', DateTime.utc(2026, 8, 1, 7));
-    final Workout pullA = _completed('Pull A', DateTime.utc(2026, 8, 2, 7));
+  test('deleting all history returns the programme to Push A Hybrid', () async {
+    final Workout pushA =
+        _completed('Push A Hybrid', DateTime.utc(2026, 8, 1, 7));
+    final Workout pullA =
+        _completed('Pull A Hybrid', DateTime.utc(2026, 8, 2, 7));
     final _MemoryWorkoutRepository repository = _MemoryWorkoutRepository(
       <Workout>[pushA, pullA],
     );
@@ -199,7 +149,7 @@ void main() {
 
     expect(
       WorkoutProgram.nextIncompleteWorkout(await repository.getAll())?.name,
-      'Push A',
+      'Push A Hybrid',
     );
   });
 }
@@ -223,22 +173,10 @@ List<Workout> _programTemplates() {
       .toList(growable: false);
 }
 
-List<Workout> _crossFitTemplates() {
-  return WorkoutProgram.crossFitWorkoutNames
-      .map(
-        (String name) => _workout(
-          name,
-          WorkoutStatus.planned,
-          track: WorkoutTrack.crossFit,
-        ),
-      )
-      .toList(growable: false);
-}
-
 Workout _workout(
   String name,
   WorkoutStatus status, {
-  WorkoutTrack track = WorkoutTrack.strengthPpl,
+  WorkoutTrack track = WorkoutTrack.hybrid,
 }) {
   final String id = name.toLowerCase().replaceAll(' ', '-');
   return Workout(
@@ -265,7 +203,7 @@ Workout _workout(
 Workout _completed(
   String name,
   DateTime completedAt, {
-  WorkoutTrack track = WorkoutTrack.strengthPpl,
+  WorkoutTrack track = WorkoutTrack.hybrid,
 }) {
   final Workout planned = _workout(
     name,

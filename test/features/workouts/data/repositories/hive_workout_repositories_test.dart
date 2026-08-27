@@ -10,7 +10,6 @@ import 'package:sagelift/features/workouts/data/repositories/hive_exercise_repos
 import 'package:sagelift/features/workouts/data/repositories/hive_workout_repository.dart';
 import 'package:sagelift/features/workouts/data/services/workout_seed_service.dart';
 import 'package:sagelift/features/workouts/domain/models/conditioning.dart';
-import 'package:sagelift/features/workouts/domain/models/exercise.dart';
 import 'package:sagelift/features/workouts/domain/models/workout.dart';
 import 'package:sagelift/features/workouts/domain/models/workout_set.dart';
 
@@ -29,242 +28,147 @@ void main() {
     await temporaryDirectory.delete(recursive: true);
   });
 
-  test('persists workout data and seeds an empty database once', () async {
-    final WorkoutHiveStore store = await WorkoutHiveStore.open();
-    final HiveExerciseRepository exerciseRepository = HiveExerciseRepository(
-      store.exerciseBox,
-    );
-    final HiveWorkoutRepository workoutRepository = HiveWorkoutRepository(
-      store.workoutBox,
+  test('seeds the six Hybrid templates idempotently', () async {
+    final _Repositories repositories = await _openRepositories();
+    final WorkoutSeedService seedService = WorkoutSeedService(
+      exerciseRepository: repositories.exerciseRepository,
+      workoutRepository: repositories.workoutRepository,
     );
 
-    await WorkoutSeedService(
-      exerciseRepository: exerciseRepository,
-      workoutRepository: workoutRepository,
-    ).seedIfEmpty();
+    await seedService.seedIfEmpty();
 
-    final List<Exercise> exercises = await exerciseRepository.getAll();
-    final List<Workout> workouts = await workoutRepository.getAll();
-
-    expect(exercises, hasLength(48));
-    expect(workouts, hasLength(12));
+    final List<Workout> workouts =
+        await repositories.workoutRepository.getAll();
+    final List<Workout> hybridWorkouts = workouts
+        .where((Workout workout) => workout.track == WorkoutTrack.hybrid)
+        .toList(growable: false);
+    expect(hybridWorkouts, hasLength(6));
     expect(
-      workouts
-          .where((Workout workout) => workout.track == WorkoutTrack.crossFit),
+      hybridWorkouts.map((Workout workout) => workout.name),
+      containsAll(<String>[
+        'Push A Hybrid',
+        'Pull A Hybrid',
+        'Legs A Hybrid',
+        'Push B Hybrid',
+        'Pull B Hybrid',
+        'Legs B Hybrid',
+      ]),
+    );
+
+    final Workout pushA = hybridWorkouts.singleWhere(
+      (Workout workout) => workout.name == 'Push A Hybrid',
+    );
+    expect(pushA.warmUp, contains('5 min'));
+    expect(pushA.sessionDurationTarget, 'Up to about 60 min');
+    expect(pushA.exerciseIds, hasLength(5));
+    expect(pushA.sets, hasLength(16));
+    expect(pushA.conditioningPlan?.format, ConditioningFormat.roundsForTime);
+    expect(pushA.conditioningPlan?.prescribedRounds, 4);
+    expect(
+      pushA.conditioningPlan?.movements.map(
+        (ConditioningMovement movement) => movement.name,
+      ),
+      equals(<String>[
+        'Kettlebell Swings',
+        'Alternating Kettlebell Reverse Lunges',
+        'Step-ups',
+        'Run',
+      ]),
+    );
+    expect(await repositories.exerciseRepository.getAll(), isNotEmpty);
+
+    await seedService.seedIfEmpty();
+    expect(
+      (await repositories.workoutRepository.getAll())
+          .where((Workout workout) => workout.track == WorkoutTrack.hybrid),
       hasLength(6),
-    );
-    expect(
-      workouts
-          .singleWhere((Workout workout) => workout.name == 'CrossFit A')
-          .conditioningPlan
-          ?.prescribedRounds,
-      4,
-    );
-    expect(
-      exercises.map((Exercise exercise) => exercise.name),
-      isNot(contains('Machine Chest Press')),
-    );
-    expect(
-      exercises.map((Exercise exercise) => exercise.name),
-      isNot(contains('Cable Lateral Raise')),
-    );
-
-    for (final _ExpectedWorkout expectedWorkout in _expectedWorkouts) {
-      final Workout workout = workouts.singleWhere(
-        (Workout candidate) => candidate.name == expectedWorkout.name,
-      );
-      expect(workout.id, expectedWorkout.id);
-      expect(
-        workout.exerciseIds,
-        equals(
-          expectedWorkout.prescriptions
-              .map(
-                (_ExpectedPrescription prescription) => prescription.exerciseId,
-              )
-              .toList(growable: false),
-        ),
-      );
-      expect(
-        workout.sets,
-        hasLength(
-          expectedWorkout.prescriptions.fold<int>(
-            0,
-            (int total, _ExpectedPrescription prescription) =>
-                total + prescription.setCount,
-          ),
-        ),
-      );
-
-      for (final _ExpectedPrescription prescription
-          in expectedWorkout.prescriptions) {
-        final List<WorkoutSet> sets = workout.sets
-            .where(
-              (WorkoutSet set) => set.exerciseId == prescription.exerciseId,
-            )
-            .toList(growable: false);
-        expect(sets, hasLength(prescription.setCount));
-        expect(
-          sets.map((WorkoutSet set) => set.setNumber),
-          equals(
-            List<int>.generate(
-              prescription.setCount,
-              (int index) => index + 1,
-            ),
-          ),
-        );
-        expect(
-          sets.map((WorkoutSet set) => set.targetReps),
-          everyElement(equals(prescription.targetReps)),
-        );
-        expect(
-          sets.map((WorkoutSet set) => set.notes),
-          everyElement(equals(prescription.notes)),
-        );
-      }
-    }
-
-    await WorkoutSeedService(
-      exerciseRepository: exerciseRepository,
-      workoutRepository: workoutRepository,
-    ).seedIfEmpty();
-
-    expect(await workoutRepository.getAll(), hasLength(12));
-
-    const Exercise exercise = Exercise(
-      id: 'exercise-1',
-      name: 'Test press',
-      category: ExerciseCategory.strength,
-      equipment: Equipment.barbell,
-    );
-    final Workout workout = Workout(
-      id: 'workout-1',
-      name: 'Test workout',
-      scheduledDate: DateTime.utc(2026, 7, 30),
-      status: WorkoutStatus.planned,
-      exerciseIds: const <String>['exercise-1'],
-      sets: const <WorkoutSet>[
-        WorkoutSet(
-          id: 'set-1',
-          exerciseId: 'exercise-1',
-          setNumber: 1,
-          status: WorkoutSetStatus.planned,
-          targetReps: 8,
-        ),
-      ],
-    );
-
-    await exerciseRepository.save(exercise);
-    await workoutRepository.save(workout);
-
-    expect(await exerciseRepository.getById(exercise.id), exercise);
-    expect(await exerciseRepository.searchByName('PRESS'), contains(exercise));
-    expect(await workoutRepository.getById(workout.id), workout);
-    expect(
-      await workoutRepository.getForDate(DateTime(2026, 7, 30, 18)),
-      contains(workout),
     );
   });
 
-  test('persists completed workout records with their recorded sets', () async {
-    final WorkoutHiveStore store = await WorkoutHiveStore.open();
-    final HiveWorkoutRepository workoutRepository = HiveWorkoutRepository(
-      store.workoutBox,
+  test('migration retains legacy PPL and CrossFit completed history verbatim',
+      () async {
+    final _Repositories repositories = await _openRepositories();
+    final Workout legacyPpl = _completedWorkout(
+      id: 'legacy-ppl-history',
+      name: 'Push A',
+      track: WorkoutTrack.strengthPpl,
+      completedAt: DateTime.utc(2026, 8, 1, 7),
     );
-    final DateTime startedAt = DateTime.utc(2026, 7, 30, 6, 15);
-    final DateTime completedAt = DateTime.utc(2026, 7, 30, 7, 5);
-    final Workout completedWorkout = Workout(
-      id: 'completed-workout-1',
-      name: 'Completed workout',
-      scheduledDate: DateTime.utc(2026, 7, 30),
-      status: WorkoutStatus.completed,
-      exerciseIds: const <String>['exercise-1'],
-      sets: const <WorkoutSet>[
-        WorkoutSet(
-          id: 'completed-set-1',
-          exerciseId: 'exercise-1',
-          setNumber: 1,
-          weightKg: 80,
-          reps: 10,
-          targetReps: 10,
-          status: WorkoutSetStatus.completed,
-        ),
-      ],
-      startedAt: startedAt,
-      completedAt: completedAt,
+    final Workout legacyCrossFit = _completedWorkout(
+      id: 'legacy-crossfit-history',
+      name: 'CrossFit A',
+      track: WorkoutTrack.crossFit,
+      completedAt: DateTime.utc(2026, 8, 2, 7),
+      conditioningResult: ConditioningResult(
+        roundsCompleted: 3,
+        additionalReps: 5,
+        completionTime: Duration(minutes: 18),
+        scaling: 'Step-ups',
+        isCompleted: false,
+        movementResults: <ConditioningMovementResult>[
+          ConditioningMovementResult(
+            movementId: 'legacy-swing',
+            actualLoad: 10,
+          ),
+        ],
+      ),
     );
+    await repositories.workoutRepository.save(legacyPpl);
+    await repositories.workoutRepository.save(legacyCrossFit);
 
-    await workoutRepository.save(completedWorkout);
+    await WorkoutSeedService(
+      exerciseRepository: repositories.exerciseRepository,
+      workoutRepository: repositories.workoutRepository,
+    ).seedIfEmpty();
 
     expect(
-      await workoutRepository.getById(completedWorkout.id),
-      completedWorkout,
+      await repositories.workoutRepository.getById(legacyPpl.id),
+      legacyPpl,
+    );
+    expect(
+      await repositories.workoutRepository.getById(legacyCrossFit.id),
+      legacyCrossFit,
+    );
+    expect(
+      (await repositories.workoutRepository.getById(legacyCrossFit.id))
+          ?.conditioningResult
+          ?.movementResults
+          .single
+          .actualLoad,
+      10,
+    );
+  });
+
+  test('persists completed workout records across a repository reload',
+      () async {
+    final _Repositories repositories = await _openRepositories();
+    final Workout completedWorkout = _completedWorkout(
+      id: 'completed-workout-1',
+      name: 'Push A Hybrid',
+      track: WorkoutTrack.hybrid,
+      completedAt: DateTime.utc(2026, 7, 30, 7, 5),
     );
 
-    await store.workoutBox.close();
+    await repositories.workoutRepository.save(completedWorkout);
+    await repositories.store.workoutBox.close();
     final WorkoutHiveStore reopenedStore = await WorkoutHiveStore.open();
     final HiveWorkoutRepository reopenedRepository = HiveWorkoutRepository(
       reopenedStore.workoutBox,
     );
+
     expect(
       await reopenedRepository.getById(completedWorkout.id),
       completedWorkout,
     );
   });
 
-  test('persists incomplete CrossFit conditioning results', () async {
-    final WorkoutHiveStore store = await WorkoutHiveStore.open();
-    final HiveWorkoutRepository repository = HiveWorkoutRepository(
-      store.workoutBox,
-    );
-    final Workout workout = Workout(
-      id: 'crossfit-result',
-      name: 'CrossFit A',
-      scheduledDate: DateTime.utc(2026, 8, 8),
-      status: WorkoutStatus.completed,
-      track: WorkoutTrack.crossFit,
-      completedAt: DateTime.utc(2026, 8, 8, 7),
-      conditioningPlan: ConditioningPlan(
-        format: ConditioningFormat.roundsForTime,
-        title: '4 rounds for time',
-        instructions: 'Test movements',
-        prescribedRounds: 4,
-      ),
-      conditioningResult: ConditioningResult(
-        roundsCompleted: 3,
-        additionalReps: 12,
-        completionTime: Duration(minutes: 18, seconds: 42),
-        weightKg: 10,
-        scaling: 'Step-ups and band-assisted pull-ups',
-        isCompleted: false,
-        movementResults: const <ConditioningMovementResult>[
-          ConditioningMovementResult(
-            movementId: 'goblet-reverse-lunge',
-            actualLoad: 15,
-          ),
-          ConditioningMovementResult(
-            movementId: 'dumbbell-deadlift',
-            actualLoad: 15,
-            implementCount: 2,
-          ),
-        ],
-      ),
-    );
-
-    await repository.save(workout);
-
-    expect(await repository.getById(workout.id), workout);
-  });
-
   test('decodes legacy generic conditioning data without movement records',
       () async {
-    final WorkoutHiveStore store = await WorkoutHiveStore.open();
-    final HiveWorkoutRepository repository = HiveWorkoutRepository(
-      store.workoutBox,
-    );
-    await store.workoutBox.put(
-      'legacy-crossfit-b',
+    final _Repositories repositories = await _openRepositories();
+    await repositories.store.workoutBox.put(
+      'legacy-crossfit-generic',
       WorkoutHiveModel(
-        id: 'legacy-crossfit-b',
+        id: 'legacy-crossfit-generic',
         name: 'CrossFit B',
         scheduledDateMilliseconds:
             DateTime.utc(2026, 8, 1).millisecondsSinceEpoch,
@@ -279,144 +183,79 @@ void main() {
         roundsCompleted: 4,
         additionalReps: 0,
         completionTimeMilliseconds: const Duration(minutes: 30).inMilliseconds,
-        conditioningScaling:
-            '15kg goblet lunges; 2 x 15kg DB deadlifts; step-ups.',
+        conditioningScaling: '15 kg goblet lunges; step-ups.',
         conditioningCompleted: true,
       ),
     );
 
-    final Workout? decoded = await repository.getById('legacy-crossfit-b');
-
-    expect(decoded?.conditioningResult?.roundsCompleted, 4);
+    final Workout? decoded = await repositories.workoutRepository.getById(
+      'legacy-crossfit-generic',
+    );
+    expect(decoded?.track, WorkoutTrack.crossFit);
     expect(decoded?.conditioningResult?.movementResults, isEmpty);
     expect(decoded?.conditioningResult?.scaling, contains('goblet lunges'));
   });
 }
 
-const List<_ExpectedWorkout> _expectedWorkouts = <_ExpectedWorkout>[
-  _ExpectedWorkout(
-    id: 'seed-workout-push-a',
-    name: 'Push A',
-    prescriptions: <_ExpectedPrescription>[
-      _ExpectedPrescription('seed-exercise-barbell-bench-press', 10,
-          'Target 6–10 reps; rest 2–3 min'),
-      _ExpectedPrescription('seed-exercise-incline-dumbbell-press', 12,
-          'Target 8–12 reps; rest 2 min'),
-      _ExpectedPrescription('seed-exercise-seated-dumbbell-shoulder-press', 12,
-          'Target 8–12 reps; rest 2 min'),
-      _ExpectedPrescription('seed-exercise-dumbbell-lateral-raise', 15,
-          'Target 12–15 reps; rest 60–90 sec'),
-      _ExpectedPrescription('seed-exercise-cable-triceps-pushdown', 15,
-          'Target 10–15 reps; rest 60–90 sec'),
-      _ExpectedPrescription('seed-exercise-overhead-rope-triceps-extension', 15,
-          'Target 10-15 reps; rest 60-90 sec',
-          setCount: 1),
-    ],
-  ),
-  _ExpectedWorkout(
-    id: 'seed-workout-pull-a',
-    name: 'Pull A',
-    prescriptions: <_ExpectedPrescription>[
-      _ExpectedPrescription('seed-exercise-barbell-bent-over-row', 10,
-          'Target 6–10 reps; rest 2–3 min'),
-      _ExpectedPrescription('seed-exercise-one-arm-dumbbell-row', 12,
-          'Target 8–12 reps per side; rest 90 sec'),
-      _ExpectedPrescription('seed-exercise-cable-lat-pulldown', 12,
-          'Target 8–12 reps; rest 2 min'),
-      _ExpectedPrescription('seed-exercise-dumbbell-rear-delt-fly', 15,
-          'Target 12–15 reps; rest 60–90 sec'),
-      _ExpectedPrescription('seed-exercise-dumbbell-hammer-curl', 15,
-          'Target 10–15 reps; rest 60–90 sec'),
-    ],
-  ),
-  _ExpectedWorkout(
-    id: 'seed-workout-legs-a',
-    name: 'Legs A',
-    prescriptions: <_ExpectedPrescription>[
-      _ExpectedPrescription('seed-exercise-barbell-back-squat', 10,
-          'Target 6–10 reps; rest 2–3 min'),
-      _ExpectedPrescription('seed-exercise-romanian-deadlift', 12,
-          'Target 8–12 reps; rest 2–3 min'),
-      _ExpectedPrescription('seed-exercise-dumbbell-reverse-lunge', 12,
-          'Target 8–12 reps per leg; rest 90 sec'),
-      _ExpectedPrescription('seed-exercise-standing-dumbbell-calf-raise', 15,
-          'Target 12–15 reps; rest 60–90 sec'),
-      _ExpectedPrescription(
-          'seed-exercise-plank', 45, 'Hold for 30–45 seconds; rest 60 sec'),
-    ],
-  ),
-  _ExpectedWorkout(
-    id: 'seed-workout-push-b',
-    name: 'Push B',
-    prescriptions: <_ExpectedPrescription>[
-      _ExpectedPrescription('seed-exercise-incline-barbell-bench-press', 10,
-          'Target 6–10 reps; rest 2–3 min'),
-      _ExpectedPrescription('seed-exercise-flat-dumbbell-bench-press', 12,
-          'Target 8–12 reps; rest 2 min'),
-      _ExpectedPrescription('seed-exercise-standing-barbell-overhead-press', 10,
-          'Target 6–10 reps; rest 2–3 min'),
-      _ExpectedPrescription('seed-exercise-dumbbell-lateral-raise', 15,
-          'Target 12–15 reps; rest 60–90 sec'),
-      _ExpectedPrescription('seed-exercise-overhead-dumbbell-triceps-extension',
-          15, 'Target 10–15 reps; rest 60–90 sec'),
-    ],
-  ),
-  _ExpectedWorkout(
-    id: 'seed-workout-pull-b',
-    name: 'Pull B',
-    prescriptions: <_ExpectedPrescription>[
-      _ExpectedPrescription('seed-exercise-conventional-deadlift', 8,
-          'Target 5–8 reps; rest 3 min'),
-      _ExpectedPrescription('seed-exercise-chest-supported-dumbbell-row', 12,
-          'Target 8–12 reps; rest 2 min'),
-      _ExpectedPrescription(
-          'seed-exercise-cable-seated-row', 12, 'Target 8–12 reps; rest 2 min'),
-      _ExpectedPrescription('seed-exercise-cable-face-pull', 15,
-          'Target 12–15 reps; rest 60–90 sec'),
-      _ExpectedPrescription('seed-exercise-alternating-dumbbell-curl', 15,
-          'Target 10–15 reps per arm; rest 60–90 sec'),
-    ],
-  ),
-  _ExpectedWorkout(
-    id: 'seed-workout-legs-b',
-    name: 'Legs B',
-    prescriptions: <_ExpectedPrescription>[
-      _ExpectedPrescription('seed-exercise-barbell-front-squat', 10,
-          'Target 6–10 reps; rest 2–3 min'),
-      _ExpectedPrescription('seed-exercise-barbell-hip-thrust', 12,
-          'Target 8–12 reps; rest 2 min'),
-      _ExpectedPrescription('seed-exercise-dumbbell-bulgarian-split-squat', 12,
-          'Target 8–12 reps per leg; rest 90 sec'),
-      _ExpectedPrescription('seed-exercise-standing-dumbbell-calf-raise', 15,
-          'Target 12–15 reps; rest 60–90 sec'),
-      _ExpectedPrescription('seed-exercise-lying-leg-raise', 15,
-          'Target 10–15 reps; rest 60 sec'),
-    ],
-  ),
-];
-
-class _ExpectedWorkout {
-  const _ExpectedWorkout({
-    required this.id,
-    required this.name,
-    required this.prescriptions,
-  });
-
-  final String id;
-  final String name;
-  final List<_ExpectedPrescription> prescriptions;
+Future<_Repositories> _openRepositories() async {
+  final WorkoutHiveStore store = await WorkoutHiveStore.open();
+  return _Repositories(
+    store: store,
+    exerciseRepository: HiveExerciseRepository(store.exerciseBox),
+    workoutRepository: HiveWorkoutRepository(store.workoutBox),
+  );
 }
 
-class _ExpectedPrescription {
-  const _ExpectedPrescription(
-    this.exerciseId,
-    this.targetReps,
-    this.notes, {
-    this.setCount = 3,
+class _Repositories {
+  const _Repositories({
+    required this.store,
+    required this.exerciseRepository,
+    required this.workoutRepository,
   });
 
-  final String exerciseId;
-  final int targetReps;
-  final String notes;
-  final int setCount;
+  final WorkoutHiveStore store;
+  final HiveExerciseRepository exerciseRepository;
+  final HiveWorkoutRepository workoutRepository;
+}
+
+Workout _completedWorkout({
+  required String id,
+  required String name,
+  required WorkoutTrack track,
+  required DateTime completedAt,
+  ConditioningResult? conditioningResult,
+}) {
+  return Workout(
+    id: id,
+    name: name,
+    scheduledDate: DateTime.utc(
+      completedAt.year,
+      completedAt.month,
+      completedAt.day,
+    ),
+    status: WorkoutStatus.completed,
+    track: track,
+    exerciseIds: const <String>['exercise-1'],
+    sets: const <WorkoutSet>[
+      WorkoutSet(
+        id: 'completed-set-1',
+        exerciseId: 'exercise-1',
+        setNumber: 1,
+        weightKg: 80,
+        reps: 8,
+        status: WorkoutSetStatus.completed,
+      ),
+    ],
+    startedAt: completedAt.subtract(const Duration(minutes: 45)),
+    completedAt: completedAt,
+    conditioningPlan: conditioningResult == null
+        ? null
+        : ConditioningPlan(
+            format: ConditioningFormat.roundsForTime,
+            title: '4 rounds for time',
+            instructions: 'Recorded legacy conditioning',
+            prescribedRounds: 4,
+          ),
+    conditioningResult: conditioningResult,
+  );
 }
