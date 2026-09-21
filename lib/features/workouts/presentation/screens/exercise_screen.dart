@@ -8,14 +8,14 @@ import '../../../../app/router/app_router.dart';
 import '../../domain/models/conditioning.dart';
 import '../../domain/models/exercise.dart';
 import '../../domain/models/workout.dart';
+import '../../domain/models/workout_draft.dart';
 import '../../domain/models/workout_set.dart';
 import '../../domain/services/exercise_progression_service.dart';
 import '../providers/today_workout_provider.dart';
 import '../providers/workout_completion_controller.dart';
-import '../providers/workout_conditioning_progress_controller.dart';
+import '../providers/workout_draft_controller.dart';
 import '../providers/workout_history_provider.dart';
 import '../providers/workout_progression_provider.dart';
-import '../providers/workout_set_progress_controller.dart';
 
 /// Focused set-entry screen for one exercise in the selected workout.
 class ExerciseScreen extends ConsumerWidget {
@@ -56,16 +56,38 @@ class ExerciseScreen extends ConsumerWidget {
             final List<WorkoutSet> sets = workoutData.workout.sets
                 .where((WorkoutSet set) => set.exerciseId == exercise.id)
                 .toList(growable: false);
-            return _ExerciseContent(
-              exercise: exercise,
-              sets: sets,
-              exerciseIndex: exerciseIndex,
-              exerciseCount: workoutData.exercises.length,
-              workoutId: workoutId,
-              workoutIsCompleted:
-                  workoutData.workout.status == WorkoutStatus.completed,
-              conditioningPlan: workoutData.workout.conditioningPlan,
-            );
+            return ref.watch(workoutDraftControllerProvider(workoutId)).when(
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (Object error, StackTrace stackTrace) => Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        const Text('Unable to restore this workout draft.'),
+                        TextButton(
+                          onPressed: () => ref.invalidate(
+                              workoutDraftControllerProvider(workoutId)),
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  data: (WorkoutDraft draft) => AbsorbPointer(
+                    absorbing:
+                        ref.watch(workoutDraftFinishingProvider(workoutId)),
+                    child: _ExerciseContent(
+                      key: ValueKey<String>(workoutId),
+                      exercise: exercise,
+                      sets: sets,
+                      exerciseIndex: exerciseIndex,
+                      exerciseCount: workoutData.exercises.length,
+                      workoutId: workoutId,
+                      workoutIsCompleted:
+                          workoutData.workout.status == WorkoutStatus.completed,
+                      conditioningPlan: workoutData.workout.conditioningPlan,
+                    ),
+                  ),
+                );
           },
         ),
       ),
@@ -82,6 +104,7 @@ class _ExerciseContent extends ConsumerWidget {
     required this.workoutId,
     required this.workoutIsCompleted,
     required this.conditioningPlan,
+    super.key,
   });
 
   final Exercise exercise;
@@ -94,12 +117,17 @@ class _ExerciseContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final Map<String, WorkoutSetProgress> progress = ref.watch(
-      workoutSetProgressControllerProvider,
+    final Map<String, WorkoutSetProgress> progress = ref
+        .watch(
+          workoutDraftControllerProvider(workoutId),
+        )
+        .requireValue
+        .sets;
+    final WorkoutDraftController controller = ref.read(
+      workoutDraftControllerProvider(workoutId).notifier,
     );
-    final WorkoutSetProgressController controller = ref.read(
-      workoutSetProgressControllerProvider.notifier,
-    );
+    final AsyncValue<void> draftSave =
+        ref.watch(workoutDraftSaveProvider(workoutId));
     final AsyncValue<PreviousExercisePerformance?> previousPerformance =
         ref.watch(previousExercisePerformanceProvider(exercise.id));
     final ExerciseProgressionService progressionService =
@@ -122,6 +150,25 @@ class _ExerciseContent extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
+          if (draftSave.hasError)
+            Row(
+              children: <Widget>[
+                const Expanded(
+                    child: Text(
+                  'Draft not saved. Keep this page open and retry.',
+                )),
+                TextButton(
+                  onPressed: () async {
+                    try {
+                      await controller.retrySave();
+                    } catch (_) {
+                      // The persistent error message remains visible.
+                    }
+                  },
+                  child: const Text('Retry save'),
+                ),
+              ],
+            ),
           Text(exercise.name, style: Theme.of(context).textTheme.headlineSmall),
           if (repRange != null || restGuidance != null)
             Text(
@@ -209,10 +256,10 @@ class _ExerciseContent extends ConsumerWidget {
               child: FilledButton(
                 key: const ValueKey<String>('finish-workout-button'),
                 onPressed: () async {
-                  final WorkoutConditioningProgress conditioningProgress =
-                      ref.read(workoutConditioningProgressControllerProvider)[
-                              workoutId] ??
-                          WorkoutConditioningProgress();
+                  final WorkoutConditioningProgress conditioningProgress = ref
+                      .read(workoutDraftControllerProvider(workoutId))
+                      .requireValue
+                      .conditioning;
                   if (conditioningProgress.timer.isRunning &&
                       !await _confirmFinishWhileTimerRuns(context)) {
                     return;
@@ -220,10 +267,7 @@ class _ExerciseContent extends ConsumerWidget {
                   try {
                     final Workout? completedWorkout = await ref
                         .read(workoutCompletionControllerProvider)
-                        .finishWorkout(
-                          workoutId,
-                          conditioningResult: _conditioningResult(ref),
-                        );
+                        .finishWorkout(workoutId);
                     if (!context.mounted || completedWorkout == null) return;
                     context.goNamed(
                       AppRoute.workoutSummary.name,
@@ -267,50 +311,14 @@ class _ExerciseContent extends ConsumerWidget {
     );
   }
 
-  ConditioningResult? _conditioningResult(WidgetRef ref) {
-    if (conditioningPlan == null) return null;
-    final WorkoutConditioningProgress progress = ref.read(
-          workoutConditioningProgressControllerProvider,
-        )[workoutId] ??
-        WorkoutConditioningProgress();
-    final int minutes = int.tryParse(progress.minutes) ?? 0;
-    final int seconds = int.tryParse(progress.seconds) ?? 0;
-    final Duration? completionTime = minutes == 0 && seconds == 0
-        ? null
-        : Duration(minutes: minutes, seconds: seconds);
-    return ConditioningResult(
-      roundsCompleted: int.tryParse(progress.rounds) ?? 0,
-      additionalReps: int.tryParse(progress.additionalReps) ?? 0,
-      completionTime: completionTime,
-      movementResults: <ConditioningMovementResult>[
-        for (final ConditioningMovement movement in conditioningPlan!.movements)
-          ConditioningMovementResult(
-            movementId: movement.id,
-            actualLoad:
-                double.tryParse(progress.movements[movement.id]?.load ?? ''),
-            implementCount: int.tryParse(
-              progress.movements[movement.id]?.implementCount ?? '',
-            ),
-            modification: (progress.movements[movement.id]?.modification ?? '')
-                    .trim()
-                    .isEmpty
-                ? null
-                : progress.movements[movement.id]!.modification.trim(),
-          ),
-      ],
-      scaling: progress.scaling.trim().isEmpty ? null : progress.scaling.trim(),
-      isCompleted: progress.isCompleted,
-    );
-  }
-
   Future<bool> _confirmFinishWhileTimerRuns(BuildContext context) async {
     return await showDialog<bool>(
           context: context,
           builder: (BuildContext dialogContext) => AlertDialog(
             title: const Text('Conditioning is still active'),
             content: const Text(
-              'Finish Conditioning before finishing the workout, or confirm '
-              'that you want to finish the workout now.',
+              'Finishing will stop the timer and save its elapsed time. '
+              'Any manual time correction will be kept.',
             ),
             actions: <Widget>[
               TextButton(
@@ -359,18 +367,21 @@ class _ConditioningEntryCardState
 
   @override
   Widget build(BuildContext context) {
-    final WorkoutConditioningProgress progress = ref.watch(
-          workoutConditioningProgressControllerProvider,
-        )[widget.workoutId] ??
-        WorkoutConditioningProgress();
-    final WorkoutConditioningProgressController controller = ref.read(
-      workoutConditioningProgressControllerProvider.notifier,
+    final WorkoutConditioningProgress progress = ref
+        .watch(
+          workoutDraftControllerProvider(widget.workoutId),
+        )
+        .requireValue
+        .conditioning;
+    final WorkoutDraftController controller = ref.read(
+      workoutDraftControllerProvider(widget.workoutId).notifier,
     );
     void update(WorkoutConditioningProgress value) =>
-        controller.update(widget.workoutId, value);
+        controller.updateConditioning(value);
+    final DateTime Function() now = ref.read(workoutClockProvider);
     final bool isForTime =
         widget.plan.format == ConditioningFormat.roundsForTime;
-    final Duration elapsed = progress.timer.elapsedAt(DateTime.now());
+    final Duration elapsed = progress.timer.elapsedAt(now());
     final AsyncValue<Workout?> previous = ref.watch(
       previousCrossFitConditioningProvider(widget.workoutId),
     );
@@ -412,11 +423,9 @@ class _ConditioningEntryCardState
                 child: FilledButton(
                   onPressed: () {
                     if (progress.timer.isRunning) {
-                      controller.pauseTimer(widget.workoutId, DateTime.now());
-                    } else if (progress.timer.elapsed == Duration.zero) {
-                      controller.startTimer(widget.workoutId, DateTime.now());
+                      controller.pauseTimer(now());
                     } else {
-                      controller.startTimer(widget.workoutId, DateTime.now());
+                      controller.startTimer(now());
                     }
                   },
                   child: Text(progress.timer.isRunning
@@ -434,8 +443,7 @@ class _ConditioningEntryCardState
                     width: double.infinity,
                     child: OutlinedButton(
                       onPressed: () => controller.finishTimer(
-                        widget.workoutId,
-                        DateTime.now(),
+                        now(),
                       ),
                       child: const Text('Finish Conditioning'),
                     ),
@@ -451,8 +459,7 @@ class _ConditioningEntryCardState
                 progress: progress.movements[movement.id] ??
                     const ConditioningMovementProgress(),
                 onChanged: (ConditioningMovementProgress value) {
-                  controller.updateMovement(
-                      widget.workoutId, movement.id, value);
+                  controller.updateMovement(movement.id, value);
                 },
               ),
             Row(
@@ -479,17 +486,31 @@ class _ConditioningEntryCardState
                     child: _ConditioningField(
                         label: 'Minutes',
                         value: progress.minutes,
-                        onChanged: (String value) =>
-                            update(progress.copyWith(minutes: value)))),
+                        onChanged: (String value) => update(progress.copyWith(
+                            minutes: value, hasManualTime: true)))),
                 const SizedBox(width: 8),
                 Expanded(
                     child: _ConditioningField(
                         label: 'Seconds',
                         value: progress.seconds,
-                        onChanged: (String value) =>
-                            update(progress.copyWith(seconds: value)))),
+                        onChanged: (String value) => update(progress.copyWith(
+                            seconds: value, hasManualTime: true)))),
               ],
             ),
+            if (isForTime) ...<Widget>[
+              Text(
+                progress.hasManualTime
+                    ? 'Manual time will be saved instead of the timer time.'
+                    : 'Timer time is saved automatically. Edit minutes or '
+                        'seconds to correct it.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              if (progress.hasManualTime)
+                TextButton(
+                  onPressed: () => controller.useTimerTime(now()),
+                  child: const Text('Use timer time'),
+                ),
+            ],
             const SizedBox(height: 8),
             CheckboxListTile(
               contentPadding: EdgeInsets.zero,
@@ -621,7 +642,7 @@ class _MovementEntryCard extends StatelessWidget {
   }
 }
 
-class _ConditioningField extends StatelessWidget {
+class _ConditioningField extends StatefulWidget {
   const _ConditioningField(
       {required this.label,
       required this.value,
@@ -634,12 +655,42 @@ class _ConditioningField extends StatelessWidget {
   final bool decimal;
 
   @override
+  State<_ConditioningField> createState() => _ConditioningFieldState();
+}
+
+class _ConditioningFieldState extends State<_ConditioningField> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.value);
+  }
+
+  @override
+  void didUpdateWidget(covariant _ConditioningField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_controller.text != widget.value) {
+      _controller.value = TextEditingValue(
+        text: widget.value,
+        selection: TextSelection.collapsed(offset: widget.value.length),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return TextFormField(
-      initialValue: value,
-      keyboardType: TextInputType.numberWithOptions(decimal: decimal),
-      decoration: InputDecoration(labelText: label, isDense: true),
-      onChanged: onChanged,
+      controller: _controller,
+      keyboardType: TextInputType.numberWithOptions(decimal: widget.decimal),
+      decoration: InputDecoration(labelText: widget.label, isDense: true),
+      onChanged: widget.onChanged,
     );
   }
 }

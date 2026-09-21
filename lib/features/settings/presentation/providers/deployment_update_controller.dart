@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/platform/deployment_version_source.dart';
+import '../../../workouts/presentation/providers/workout_draft_controller.dart';
 
 /// Compares monotonically increasing GitHub Actions build identifiers.
 bool isNewerBuildId({
@@ -62,9 +63,10 @@ class DeploymentUpdateController extends Notifier<String?> {
   }
 
   /// Reloads with a cache-busting build query; it never clears browser storage.
-  void updateNow() {
+  Future<void> updateNow() async {
     final String? buildId = state;
     if (buildId == null) return;
+    await ref.read(workoutDraftRepositoryProvider).flush();
     ref.read(deploymentVersionSourceProvider).reloadForBuild(buildId);
   }
 }

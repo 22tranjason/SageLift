@@ -1,10 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sagelift/features/workouts/domain/models/workout.dart';
+import 'package:sagelift/features/workouts/domain/models/workout_draft.dart';
 import 'package:sagelift/features/workouts/domain/models/workout_set.dart';
 import 'package:sagelift/features/workouts/domain/repositories/workout_repository.dart';
 import 'package:sagelift/features/workouts/domain/services/workout_program.dart';
 import 'package:sagelift/features/workouts/presentation/providers/workout_completion_controller.dart';
-import 'package:sagelift/features/workouts/presentation/providers/workout_set_progress_controller.dart';
 
 void main() {
   test('completion persists through a separate repository read', () async {
@@ -158,9 +158,10 @@ WorkoutCompletionController _controller(_MemoryWorkoutRepository repository) {
   return WorkoutCompletionController(
     workoutRepository: repository,
     onWorkoutChanged: () {},
-    clearSetProgress: () {},
-    clearConditioningProgress: () {},
-    readSetProgress: () => <String, WorkoutSetProgress>{},
+    finalizeDraft: (String id, DateTime now) async =>
+        WorkoutDraft(workoutId: id),
+    removeDraft: (String id) async {},
+    onFinishingChanged: (String id, bool finishing) {},
     now: () => DateTime.utc(2026, 8, 6, 7),
   );
 }

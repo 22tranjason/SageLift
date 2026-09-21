@@ -1,15 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../domain/models/conditioning.dart';
 import '../../domain/models/exercise.dart';
 import '../../domain/models/workout.dart';
+import '../../domain/models/workout_draft.dart';
 import '../../domain/models/workout_set.dart';
 import '../../domain/repositories/exercise_repository.dart';
 import '../../domain/repositories/workout_repository.dart';
 import '../../domain/services/workout_program.dart';
 import 'today_workout_provider.dart';
-import 'workout_conditioning_progress_controller.dart';
-import 'workout_set_progress_controller.dart';
+import 'workout_draft_controller.dart';
 
 /// Coordinates the persisted start and completion state of the active workout.
 final Provider<WorkoutCompletionController>
@@ -20,11 +19,14 @@ final Provider<WorkoutCompletionController>
     onWorkoutChanged: () {
       ref.read(workoutDataRevisionProvider.notifier).state++;
     },
-    clearSetProgress:
-        ref.read(workoutSetProgressControllerProvider.notifier).clear,
-    clearConditioningProgress:
-        ref.read(workoutConditioningProgressControllerProvider.notifier).clear,
-    readSetProgress: () => ref.read(workoutSetProgressControllerProvider),
+    finalizeDraft: (String id, DateTime now) =>
+        ref.read(workoutDraftControllerProvider(id).notifier).finalize(now),
+    removeDraft: (String id) =>
+        ref.read(workoutDraftControllerProvider(id).notifier).remove(),
+    onFinishingChanged: (String id, bool finishing) {
+      ref.read(workoutDraftFinishingProvider(id).notifier).state = finishing;
+    },
+    now: ref.watch(workoutClockProvider),
   );
 });
 
@@ -57,22 +59,22 @@ class WorkoutCompletionController {
   WorkoutCompletionController({
     required WorkoutRepository workoutRepository,
     required void Function() onWorkoutChanged,
-    required void Function() clearSetProgress,
-    required void Function() clearConditioningProgress,
-    required Map<String, WorkoutSetProgress> Function() readSetProgress,
+    required Future<WorkoutDraft> Function(String, DateTime) finalizeDraft,
+    required Future<void> Function(String) removeDraft,
+    required void Function(String, bool) onFinishingChanged,
     DateTime Function()? now,
   })  : _workoutRepository = workoutRepository,
         _onWorkoutChanged = onWorkoutChanged,
-        _clearSetProgress = clearSetProgress,
-        _clearConditioningProgress = clearConditioningProgress,
-        _readSetProgress = readSetProgress,
+        _finalizeDraft = finalizeDraft,
+        _removeDraft = removeDraft,
+        _onFinishingChanged = onFinishingChanged,
         _now = now ?? DateTime.now;
 
   final WorkoutRepository _workoutRepository;
   final void Function() _onWorkoutChanged;
-  final void Function() _clearSetProgress;
-  final void Function() _clearConditioningProgress;
-  final Map<String, WorkoutSetProgress> Function() _readSetProgress;
+  final Future<WorkoutDraft> Function(String, DateTime) _finalizeDraft;
+  final Future<void> Function(String) _removeDraft;
+  final void Function(String, bool) _onFinishingChanged;
   final DateTime Function() _now;
   final Set<String> _finishingWorkoutIds = <String>{};
 
@@ -87,8 +89,6 @@ class WorkoutCompletionController {
       return currentWorkout;
     }
 
-    _clearSetProgress();
-    _clearConditioningProgress();
     final Workout startedWorkout = currentWorkout.copyWith(
       status: WorkoutStatus.inProgress,
       startedAt: _now(),
@@ -106,19 +106,18 @@ class WorkoutCompletionController {
   /// Records entered sets, marks the workout complete, and persists it.
   ///
   /// Returns null when the workout is missing or was already completed.
-  Future<Workout?> finishWorkout(
-    String workoutId, {
-    ConditioningResult? conditioningResult,
-  }) async {
+  Future<Workout?> finishWorkout(String workoutId) async {
     if (!_finishingWorkoutIds.add(workoutId)) return null;
+    _onFinishingChanged(workoutId, true);
     try {
       final Workout? workout = await _workoutRepository.getById(workoutId);
       if (workout == null || workout.status == WorkoutStatus.completed) {
         return null;
       }
 
-      final Map<String, WorkoutSetProgress> progressBySetId =
-          _readSetProgress();
+      final DateTime finishedAt = _now();
+      final WorkoutDraft draft = await _finalizeDraft(workoutId, finishedAt);
+      final Map<String, WorkoutSetProgress> progressBySetId = draft.sets;
       final List<WorkoutSet> completedSets = workout.sets
           .map(
             (WorkoutSet set) => _completedSet(
@@ -127,13 +126,14 @@ class WorkoutCompletionController {
             ),
           )
           .toList(growable: false);
-      final DateTime finishedAt = _now();
       final Workout completedWorkout = workout.copyWith(
         status: WorkoutStatus.completed,
         startedAt: workout.startedAt ?? finishedAt,
         completedAt: finishedAt,
         sets: completedSets,
-        conditioningResult: conditioningResult,
+        conditioningResult: workout.conditioningPlan == null
+            ? null
+            : draft.conditioning.resultFor(workout.conditioningPlan!),
       );
       await _workoutRepository.save(completedWorkout);
       final Workout? savedWorkout = await _workoutRepository.getById(workoutId);
@@ -145,11 +145,12 @@ class WorkoutCompletionController {
       if (workout.track == WorkoutTrack.hybrid) {
         await _ensureRecommendedPlannedWorkout(WorkoutTrack.hybrid);
       }
-      _clearConditioningProgress();
+      await _removeDraft(workoutId);
       _onWorkoutChanged();
       return savedWorkout;
     } finally {
       _finishingWorkoutIds.remove(workoutId);
+      _onFinishingChanged(workoutId, false);
     }
   }
 

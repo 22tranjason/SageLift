@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:sagelift/core/storage/key_value_store.dart';
 import 'package:sagelift/features/check_ins/data/adapters/daily_check_in_hive_adapters.dart';
 import 'package:sagelift/features/check_ins/data/models/daily_check_in_hive_model.dart';
 import 'package:sagelift/features/habits/data/adapters/habit_hive_adapters.dart';
@@ -12,6 +13,9 @@ import 'package:sagelift/features/workouts/data/adapters/workout_hive_adapters.d
 import 'package:sagelift/features/workouts/data/models/exercise_hive_model.dart';
 import 'package:sagelift/features/workouts/data/models/workout_hive_model.dart';
 import 'package:sagelift/features/workouts/data/models/workout_set_hive_model.dart';
+import 'package:sagelift/features/workouts/data/repositories/local_workout_draft_repository.dart';
+import 'package:sagelift/features/workouts/domain/models/workout_draft.dart';
+import 'package:sagelift/features/workouts/domain/services/for_time_timer.dart';
 
 void main() {
   late Directory temporaryDirectory;
@@ -128,6 +132,92 @@ void main() {
     expect(workoutBox.get('workout-1')?.trackIndex, 0);
     expect(workoutBox.get('workout-1')?.conditioningMovementsJson, isNull);
   });
+
+  test('draft survives Hive reopening and existing backup restore format',
+      () async {
+    await _seed(exerciseBox, workoutBox, checkInBox, habitBox, settingsBox);
+    final DateTime startedAt = DateTime.utc(2026, 9, 21, 8);
+    final LocalWorkoutDraftRepository drafts =
+        LocalWorkoutDraftRepository(_BoxKeyValueStore(settingsBox));
+    await drafts.save(WorkoutDraft(
+      workoutId: 'active-session',
+      sets: const <String, WorkoutSetProgress>{
+        'set-1': WorkoutSetProgress(weight: '87.5', reps: '9'),
+      },
+      conditioning: WorkoutConditioningProgress(
+        timer: ForTimeTimer(
+            startedAt: startedAt, elapsed: const Duration(seconds: 15)),
+        movements: const <String, ConditioningMovementProgress>{
+          'snatch':
+              ConditioningMovementProgress(load: '22.5', modification: 'Hang'),
+        },
+      ),
+    ));
+    await drafts.flush();
+    await settingsBox.close();
+    settingsBox = await Hive.openBox<dynamic>('backup_settings');
+    final WorkoutDraft reopened =
+        await LocalWorkoutDraftRepository(_BoxKeyValueStore(settingsBox))
+            .load('active-session');
+    expect(reopened.sets['set-1']!.weight, '87.5');
+    expect(reopened.sets['set-1']!.reps, '9');
+    expect(reopened.conditioning.movements['snatch']!.load, '22.5');
+    expect(reopened.conditioning.movements['snatch']!.modification, 'Hang');
+    expect(
+        reopened.conditioning.timer
+            .elapsedAt(startedAt.add(const Duration(minutes: 2))),
+        const Duration(seconds: 135));
+
+    final SageLiftBackupService service =
+        _service(exerciseBox, workoutBox, checkInBox, habitBox, settingsBox);
+    final String backup = service.createBackup().contents;
+    expect((jsonDecode(backup) as Map<String, dynamic>)['schemaVersion'], 1);
+    await settingsBox.clear();
+    await service.restore(backup);
+    final WorkoutDraft restored =
+        await LocalWorkoutDraftRepository(_BoxKeyValueStore(settingsBox))
+            .load('active-session');
+    expect(restored.sets['set-1']!.weight, '87.5');
+    expect(restored.conditioning.timer.startedAt, startedAt);
+    expect(workoutBox.get('workout-1')!.name, 'Completed workout');
+    expect(workoutBox.length, 1);
+  });
+
+  test('backup without draft keys restores with no migration or history edits',
+      () async {
+    await _seed(exerciseBox, workoutBox, checkInBox, habitBox, settingsBox);
+    final SageLiftBackupService service =
+        _service(exerciseBox, workoutBox, checkInBox, habitBox, settingsBox);
+    final String oldBackup = service.createBackup().contents;
+    await LocalWorkoutDraftRepository(_BoxKeyValueStore(settingsBox))
+        .save(WorkoutDraft(workoutId: 'active-session'));
+    await service.restore(oldBackup);
+    final WorkoutDraft empty =
+        await LocalWorkoutDraftRepository(_BoxKeyValueStore(settingsBox))
+            .load('active-session');
+    expect(empty.sets, isEmpty);
+    expect(empty.conditioning.timer.isRunning, isFalse);
+    expect(settingsBox.keys, <String>['app.theme_preference']);
+    expect(workoutBox.get('workout-1')!.statusIndex, 2);
+  });
+}
+
+class _BoxKeyValueStore implements KeyValueStore {
+  _BoxKeyValueStore(this.box);
+
+  final Box<dynamic> box;
+
+  @override
+  Future<void> initialize() async {}
+
+  @override
+  Future<T?> read<T>(String key) async => box.get(key) as T?;
+
+  @override
+  Future<void> write<T>(String key, T value) => box.put(key, value);
+
+  @override
+  Future<void> delete(String key) => box.delete(key);
 }
 
 SageLiftBackupService _service(

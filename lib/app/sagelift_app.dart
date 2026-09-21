@@ -72,26 +72,64 @@ class _SageLiftAppState extends ConsumerState<SageLiftApp>
   }
 }
 
-class _UpdateAvailablePrompt extends ConsumerWidget {
+class _UpdateAvailablePrompt extends ConsumerStatefulWidget {
   const _UpdateAvailablePrompt();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_UpdateAvailablePrompt> createState() =>
+      _UpdateAvailablePromptState();
+}
+
+class _UpdateAvailablePromptState
+    extends ConsumerState<_UpdateAvailablePrompt> {
+  bool _updating = false;
+  bool _saveFailed = false;
+
+  @override
+  Widget build(BuildContext context) {
     return Material(
       color: Colors.black54,
       child: Center(
         child: AlertDialog(
           title: const Text('A new SageLift update is available.'),
+          content: _saveFailed
+              ? const Text(
+                  'Your workout draft could not be saved. The app has stayed '
+                  'open. Free some device storage and try again.',
+                )
+              : _updating
+                  ? const Text('Saving workout progress…')
+                  : null,
           actions: <Widget>[
             TextButton(
-              onPressed:
-                  ref.read(deploymentUpdateControllerProvider.notifier).dismiss,
+              onPressed: _updating
+                  ? null
+                  : ref
+                      .read(deploymentUpdateControllerProvider.notifier)
+                      .dismiss,
               child: const Text('Later'),
             ),
             FilledButton(
-              onPressed: ref
-                  .read(deploymentUpdateControllerProvider.notifier)
-                  .updateNow,
+              onPressed: _updating
+                  ? null
+                  : () async {
+                      setState(() {
+                        _updating = true;
+                        _saveFailed = false;
+                      });
+                      try {
+                        await ref
+                            .read(deploymentUpdateControllerProvider.notifier)
+                            .updateNow();
+                      } catch (_) {
+                        if (mounted) {
+                          setState(() {
+                            _saveFailed = true;
+                            _updating = false;
+                          });
+                        }
+                      }
+                    },
               child: const Text('Update now'),
             ),
           ],
