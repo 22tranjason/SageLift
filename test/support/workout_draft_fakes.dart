@@ -54,13 +54,14 @@ Workout draftTestWorkout({
   String id = 'push',
   String name = 'Push A Hybrid',
   WorkoutStatus status = WorkoutStatus.inProgress,
+  WorkoutTrack track = WorkoutTrack.crossFit,
 }) =>
     Workout(
       id: id,
       name: name,
       scheduledDate: DateTime.utc(2026, 9, 21),
       status: status,
-      track: WorkoutTrack.hybrid,
+      track: track,
       exerciseIds: const <String>['press'],
       sets: <WorkoutSet>[
         WorkoutSet(

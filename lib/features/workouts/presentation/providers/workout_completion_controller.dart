@@ -83,9 +83,14 @@ class WorkoutCompletionController {
   /// A completed workout is returned as null so it cannot be completed again.
   Future<Workout?> startWorkout(Workout workout) async {
     final Workout? storedWorkout = await _workoutRepository.getById(workout.id);
-    final Workout currentWorkout = storedWorkout ?? workout;
+    final Workout currentWorkout =
+        WorkoutProgram.withoutUnfinishedConditioning(storedWorkout ?? workout);
     if (currentWorkout.status == WorkoutStatus.completed) return null;
     if (currentWorkout.status == WorkoutStatus.inProgress) {
+      if (!identical(currentWorkout, storedWorkout)) {
+        await _workoutRepository.save(currentWorkout);
+        _onWorkoutChanged();
+      }
       return currentWorkout;
     }
 
@@ -105,14 +110,21 @@ class WorkoutCompletionController {
 
   /// Records entered sets, marks the workout complete, and persists it.
   ///
-  /// Returns null when the workout is missing or was already completed.
+  /// Returns null when missing or another Finish is running. A saved completion
+  /// can be retried to recover failed draft cleanup without rewriting history.
   Future<Workout?> finishWorkout(String workoutId) async {
     if (!_finishingWorkoutIds.add(workoutId)) return null;
     _onFinishingChanged(workoutId, true);
     try {
       final Workout? workout = await _workoutRepository.getById(workoutId);
-      if (workout == null || workout.status == WorkoutStatus.completed) {
-        return null;
+      if (workout == null) return null;
+      if (workout.status == WorkoutStatus.completed) {
+        if (workout.track == WorkoutTrack.hybrid) {
+          await _ensureRecommendedPlannedWorkout(WorkoutTrack.hybrid);
+        }
+        await _removeDraft(workoutId);
+        _onWorkoutChanged();
+        return workout;
       }
 
       final DateTime finishedAt = _now();
@@ -126,14 +138,16 @@ class WorkoutCompletionController {
             ),
           )
           .toList(growable: false);
-      final Workout completedWorkout = workout.copyWith(
+      final Workout session =
+          WorkoutProgram.withoutUnfinishedConditioning(workout);
+      final Workout completedWorkout = session.copyWith(
         status: WorkoutStatus.completed,
         startedAt: workout.startedAt ?? finishedAt,
         completedAt: finishedAt,
         sets: completedSets,
-        conditioningResult: workout.conditioningPlan == null
+        conditioningResult: session.conditioningPlan == null
             ? null
-            : draft.conditioning.resultFor(workout.conditioningPlan!),
+            : draft.conditioning.resultFor(session.conditioningPlan!),
       );
       await _workoutRepository.save(completedWorkout);
       final Workout? savedWorkout = await _workoutRepository.getById(workoutId);
@@ -190,7 +204,7 @@ class WorkoutCompletionController {
 
     final Workout? activeSameName =
         activeWorkout?.name == workoutName ? activeWorkout : null;
-    if (activeSameName != null) return activeSameName;
+    if (activeSameName != null) return startWorkout(activeSameName);
     final Workout? plannedWorkout =
         _plannedWorkoutByName(workouts, workoutName);
     final Workout? createdWorkout = plannedWorkout == null
@@ -301,7 +315,11 @@ class WorkoutCompletionController {
 
   WorkoutSet _completedSet(WorkoutSet set, WorkoutSetProgress progress) {
     if (!progress.hasRecordedValues) {
-      return set.copyWith(status: WorkoutSetStatus.skipped);
+      return set.copyWith(
+        status: set.weightKg != null || set.reps != null
+            ? WorkoutSetStatus.completed
+            : WorkoutSetStatus.skipped,
+      );
     }
     return set.copyWith(
       weightKg: double.tryParse(progress.weight),

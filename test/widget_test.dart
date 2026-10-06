@@ -86,39 +86,10 @@ void main() {
     await tester.tapAt(const Offset(8, 8));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey<String>('water-target')));
-    await tester.pumpAndSettle();
-    expect(find.text('0.25 / 3 L'), findsOneWidget);
-
-    await tester.longPress(find.byKey(const ValueKey<String>('water-target')));
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byKey(const ValueKey<String>('daily-target-number-input')),
-      '500',
-    );
-    await tester.tap(find.text('Add'));
-    await tester.pumpAndSettle();
-    expect(find.text('0.75 / 3 L'), findsOneWidget);
-
-    await tester.tap(find.byKey(const ValueKey<String>('protein-target')));
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byKey(const ValueKey<String>('daily-target-number-input')),
-      '30',
-    );
-    await tester.tap(find.text('Add'));
-    await tester.pumpAndSettle();
-    expect(find.text('30 / 160 g'), findsOneWidget);
-
-    await tester.tap(find.byKey(const ValueKey<String>('steps-target')));
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byKey(const ValueKey<String>('daily-target-number-input')),
-      '2500',
-    );
-    await tester.tap(find.text('Add'));
-    await tester.pumpAndSettle();
-    expect(find.text('2500 / 10,000'), findsOneWidget);
+    expect(find.text('Daily targets'), findsNothing);
+    expect(find.byKey(const ValueKey<String>('water-target')), findsNothing);
+    expect(find.byKey(const ValueKey<String>('protein-target')), findsNothing);
+    expect(find.byKey(const ValueKey<String>('steps-target')), findsNothing);
 
     final Finder startWorkoutButton = find.text('Start Workout');
     await tester.ensureVisible(startWorkoutButton);

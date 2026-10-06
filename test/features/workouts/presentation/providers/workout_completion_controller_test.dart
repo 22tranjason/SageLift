@@ -55,6 +55,51 @@ void main() {
     );
   });
 
+  test('Finish retries failed cleanup without rewriting completed history',
+      () async {
+    final _MemoryWorkoutRepository repository = _MemoryWorkoutRepository(
+        <Workout>[_workout('Push A Hybrid', WorkoutStatus.inProgress)]);
+    bool failCleanup = true;
+    int removed = 0;
+    final WorkoutCompletionController controller = WorkoutCompletionController(
+      workoutRepository: repository,
+      onWorkoutChanged: () {},
+      finalizeDraft: (String id, DateTime now) async =>
+          WorkoutDraft(workoutId: id),
+      removeDraft: (String id) async {
+        if (failCleanup) throw StateError('Draft cleanup failed');
+        removed++;
+      },
+      onFinishingChanged: (String id, bool finishing) {},
+      now: () => DateTime.utc(2026, 8, 6, 7),
+    );
+    await expectLater(
+        controller.finishWorkout('push-a-hybrid'), throwsStateError);
+    final Workout saved = (await repository.getById('push-a-hybrid'))!;
+    expect(saved.status, WorkoutStatus.completed);
+    failCleanup = false;
+    expect(await controller.finishWorkout(saved.id), saved);
+    expect(removed, 1);
+    expect(repository.completedSaveCount, 1);
+    expect(await controller.finishWorkout(saved.id), saved);
+    expect(repository.completedSaveCount, 1);
+  });
+
+  test('Finish retains strength already saved in an active workout', () async {
+    final Workout original =
+        _workout('Push A Hybrid', WorkoutStatus.inProgress);
+    final Workout entered = original.copyWith(sets: <WorkoutSet>[
+      original.sets.single.copyWith(weightKg: 72.5, reps: 8)
+    ]);
+    final _MemoryWorkoutRepository repository =
+        _MemoryWorkoutRepository(<Workout>[entered]);
+    final Workout saved =
+        (await _controller(repository).finishWorkout(entered.id))!;
+    expect(saved.sets.single.weightKg, 72.5);
+    expect(saved.sets.single.reps, 8);
+    expect(saved.sets.single.status, WorkoutSetStatus.completed);
+  });
+
   test('manual selection starts each program workout without completing others',
       () async {
     for (final String workoutName in WorkoutProgram.workoutNames) {

@@ -260,7 +260,8 @@ class _ExerciseContent extends ConsumerWidget {
                       .read(workoutDraftControllerProvider(workoutId))
                       .requireValue
                       .conditioning;
-                  if (conditioningProgress.timer.isRunning &&
+                  if (conditioningPlan != null &&
+                      conditioningProgress.timer.isRunning &&
                       !await _confirmFinishWhileTimerRuns(context)) {
                     return;
                   }

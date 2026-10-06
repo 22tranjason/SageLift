@@ -5,14 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/app_router.dart';
-import '../../../check_ins/presentation/providers/daily_targets_controller.dart';
 import '../../domain/models/workout.dart';
 import '../../domain/services/workout_program.dart';
 import '../providers/today_workout_provider.dart';
 import '../providers/workout_completion_controller.dart';
 import '../widgets/workout_exercise_list.dart';
 
-/// The first-use daily dashboard for workouts and health targets.
+/// The first-use daily dashboard for workouts.
 class TodayScreen extends ConsumerWidget {
   /// Creates the Today screen.
   const TodayScreen({super.key});
@@ -58,13 +57,6 @@ class TodayScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 4),
               Text(_dateLabel(now)),
-              const SizedBox(height: 24),
-              Text(
-                'Daily targets',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 8),
-              const _DailyTargetsCard(),
               const SizedBox(height: 24),
               Text(
                 'Next Workout',
@@ -326,182 +318,4 @@ class _LastWorkoutSection extends StatelessWidget {
     if (daysAgo == 1) return 'yesterday';
     return '$daysAgo days ago';
   }
-}
-
-class _DailyTargetsCard extends ConsumerWidget {
-  const _DailyTargetsCard();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final DailyTargets targets = ref.watch(dailyTargetsControllerProvider);
-    return Card(
-      child: Column(
-        children: <Widget>[
-          ListTile(
-            key: const ValueKey<String>('protein-target'),
-            title: const Text('Protein'),
-            subtitle: const Text('Tap to add grams'),
-            trailing: Text('${_numberLabel(targets.proteinGrams)} / 160 g'),
-            onTap: () => _addProtein(context, ref),
-          ),
-          ListTile(
-            key: const ValueKey<String>('water-target'),
-            title: const Text('Water'),
-            subtitle: const Text('Tap to add 250 mL'),
-            trailing: Text(
-              '${_numberLabel(targets.waterMillilitres / 1000)} / 3 L',
-            ),
-            onTap: () {
-              unawaited(
-                ref.read(dailyTargetsControllerProvider.notifier).addWater(250),
-              );
-            },
-            onLongPress: () => _addCustomWater(context, ref),
-          ),
-          ListTile(
-            key: const ValueKey<String>('steps-target'),
-            title: const Text('Steps'),
-            subtitle: const Text('Tap to enter manually'),
-            trailing: Text('${targets.steps} / 10,000'),
-            onTap: () => _setSteps(context, ref),
-          ),
-          _HabitsTile(habits: targets.habits),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _addProtein(BuildContext context, WidgetRef ref) async {
-    final double? grams = await _showNumberInputDialog(
-      context: context,
-      title: 'Add protein',
-      label: 'Grams',
-    );
-    if (grams == null) return;
-    unawaited(
-      ref.read(dailyTargetsControllerProvider.notifier).addProtein(grams),
-    );
-  }
-
-  Future<void> _addCustomWater(BuildContext context, WidgetRef ref) async {
-    final double? millilitres = await _showNumberInputDialog(
-      context: context,
-      title: 'Add water',
-      label: 'Millilitres',
-    );
-    if (millilitres == null) return;
-    unawaited(
-      ref.read(dailyTargetsControllerProvider.notifier).addWater(millilitres),
-    );
-  }
-
-  Future<void> _setSteps(BuildContext context, WidgetRef ref) async {
-    final double? enteredSteps = await _showNumberInputDialog(
-      context: context,
-      title: 'Set steps',
-      label: 'Steps',
-      allowDecimal: false,
-    );
-    if (enteredSteps == null) return;
-    unawaited(
-      ref
-          .read(dailyTargetsControllerProvider.notifier)
-          .setSteps(enteredSteps.round()),
-    );
-  }
-}
-
-class _HabitsTile extends ConsumerWidget {
-  const _HabitsTile({required this.habits});
-
-  final List<DailyHabitProgress> habits;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    if (habits.isEmpty) {
-      return const ListTile(
-        title: Text('Habits'),
-        trailing: Text('No habits yet'),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text('Habits', style: Theme.of(context).textTheme.titleMedium),
-          for (final DailyHabitProgress habit in habits)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(habit.name),
-              trailing: Checkbox(
-                value: habit.isCompleted,
-                onChanged: (bool? value) {
-                  unawaited(
-                    ref
-                        .read(dailyTargetsControllerProvider.notifier)
-                        .toggleHabit(habit.id),
-                  );
-                },
-              ),
-              onTap: () {
-                unawaited(
-                  ref
-                      .read(dailyTargetsControllerProvider.notifier)
-                      .toggleHabit(habit.id),
-                );
-              },
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-Future<double?> _showNumberInputDialog({
-  required BuildContext context,
-  required String title,
-  required String label,
-  bool allowDecimal = true,
-}) async {
-  final TextEditingController controller = TextEditingController();
-  final double? value = await showDialog<double>(
-    context: context,
-    builder: (BuildContext dialogContext) {
-      return AlertDialog(
-        title: Text(title),
-        content: TextField(
-          key: const ValueKey<String>('daily-target-number-input'),
-          controller: controller,
-          autofocus: true,
-          keyboardType: TextInputType.numberWithOptions(
-            decimal: allowDecimal,
-          ),
-          decoration: InputDecoration(labelText: label),
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final double? enteredValue = double.tryParse(controller.text);
-              Navigator.of(dialogContext).pop(
-                enteredValue == null || enteredValue <= 0 ? null : enteredValue,
-              );
-            },
-            child: const Text('Add'),
-          ),
-        ],
-      );
-    },
-  );
-  return value;
-}
-
-String _numberLabel(double value) {
-  if (value == value.roundToDouble()) return value.toInt().toString();
-  return value.toStringAsFixed(2).replaceFirst(RegExp(r'0+$'), '');
 }

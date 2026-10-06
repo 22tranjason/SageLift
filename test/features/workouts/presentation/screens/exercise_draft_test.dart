@@ -17,9 +17,12 @@ void main() {
   late DraftWorkoutRepository workouts;
   late GoRouter router;
 
-  Future<void> open(WidgetTester tester) async {
+  Future<void> open(WidgetTester tester, {bool hybrid = false}) async {
     now = DateTime.utc(2026, 9, 21, 9);
-    workouts = DraftWorkoutRepository(<Workout>[draftTestWorkout()]);
+    workouts = DraftWorkoutRepository(<Workout>[
+      draftTestWorkout(
+          track: hybrid ? WorkoutTrack.hybrid : WorkoutTrack.crossFit)
+    ]);
     container = ProviderContainer(overrides: <Override>[
       keyValueStoreProvider.overrideWithValue(DraftMemoryStore()),
       workoutRepositoryProvider.overrideWithValue(workouts),
@@ -64,6 +67,24 @@ void main() {
 
   String textOf(WidgetTester tester, String label) =>
       tester.widget<TextField>(field(label)).controller!.text;
+
+  testWidgets(
+      'unfinished Hybrid hides conditioning and stale timer cannot block Finish',
+      (WidgetTester tester) async {
+    await open(tester, hybrid: true);
+    final WorkoutDraftController controller =
+        container.read(workoutDraftControllerProvider('push').notifier);
+    controller.startTimer(now);
+    controller.updateWeight('set-1', '75');
+    controller.updateReps('set-1', '10');
+    await tester.pumpAndSettle();
+    expect(find.text('Start Conditioning'), findsNothing);
+    expect(field('Minutes'), findsNothing);
+    await tap(tester, 'Finish Workout');
+    expect(find.text('Saved summary'), findsOneWidget);
+    expect(workouts.values['push']!.conditioningResult, isNull);
+    expect(workouts.values['push']!.sets.single.weightKg, 75);
+  });
 
   testWidgets('Finish Conditioning updates mounted editable time fields',
       (WidgetTester tester) async {

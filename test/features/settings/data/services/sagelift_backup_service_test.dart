@@ -107,6 +107,49 @@ void main() {
     expect(habitBox.get('habit-1')?.name, 'Walk');
   });
 
+  test('completed Hybrid conditioning and strength survive backup roundtrip',
+      () async {
+    await _seed(exerciseBox, workoutBox, checkInBox, habitBox, settingsBox);
+    await workoutBox.put(
+        'historical-hybrid',
+        WorkoutHiveModel(
+          id: 'historical-hybrid',
+          name: 'Push A Hybrid',
+          scheduledDateMilliseconds: 1,
+          exerciseIds: const <String>['exercise-1'],
+          statusIndex: 2,
+          trackIndex: 2,
+          sets: const <WorkoutSetHiveModel>[
+            WorkoutSetHiveModel(
+                id: 'old-set',
+                exerciseId: 'exercise-1',
+                setNumber: 1,
+                statusIndex: 1,
+                weightKg: 82.5,
+                reps: 8)
+          ],
+          conditioningFormatIndex: 1,
+          conditioningTitle: 'Old circuit',
+          conditioningInstructions: 'Keep history',
+          prescribedRounds: 4,
+          roundsCompleted: 4,
+          additionalReps: 0,
+          completionTimeMilliseconds: 90000,
+          conditioningCompleted: true,
+          conditioningMovementsJson: '[]',
+          conditioningMovementResultsJson: '[]',
+        ));
+    final SageLiftBackupService service =
+        _service(exerciseBox, workoutBox, checkInBox, habitBox, settingsBox);
+    final String before = service.createBackup().contents;
+    await workoutBox.clear();
+    await service.restore(before);
+    expect(service.createBackup().contents, before);
+    expect(workoutBox.get('historical-hybrid')!.sets.single.weightKg, 82.5);
+    expect(
+        workoutBox.get('historical-hybrid')!.completionTimeMilliseconds, 90000);
+  });
+
   test('older backups without movement-specific fields remain restorable',
       () async {
     await _seed(exerciseBox, workoutBox, checkInBox, habitBox, settingsBox);

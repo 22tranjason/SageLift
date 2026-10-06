@@ -47,7 +47,7 @@ final FutureProvider<TodayWorkout?> todayWorkoutProvider =
     if (exercise != null) exercises.add(exercise);
   }
   return TodayWorkout(
-    workout: workout,
+    workout: WorkoutProgram.withoutUnfinishedConditioning(workout),
     exercises: exercises,
     isRecommended: workout.status != WorkoutStatus.inProgress,
     recommendedWorkoutName: WorkoutProgram.recommendedNextWorkoutName(
@@ -87,7 +87,7 @@ Future<TodayWorkout> _todayWorkoutFor({
     if (exercise != null) exercises.add(exercise);
   }
   return TodayWorkout(
-    workout: workout,
+    workout: WorkoutProgram.withoutUnfinishedConditioning(workout),
     exercises: exercises,
     isRecommended: workout.status != WorkoutStatus.inProgress,
     recommendedWorkoutName: WorkoutProgram.recommendedNextWorkoutName(

@@ -50,6 +50,39 @@ void main() {
 
   tearDown(() => container.dispose());
 
+  test(
+      'old Hybrid draft retires a running timer and preserves strength on retry',
+      () async {
+    final WorkoutDraftController old = await load();
+    old.updateWeight('set-1', '82.5');
+    old.updateReps('set-1', '8');
+    old.startTimer(now);
+    await container.read(workoutDraftRepositoryProvider).flush();
+    workouts.values['push'] = draftTestWorkout(track: WorkoutTrack.hybrid);
+    await recreate();
+    final WorkoutDraft draft =
+        await container.read(workoutDraftControllerProvider('push').future);
+    expect(draft.sets['set-1']!.weight, '82.5');
+    expect(draft.conditioning.timer.isRunning, isFalse);
+    expect(draft.conditioning.movements, isEmpty);
+    workouts.failCompletion = true;
+    await expectLater(
+        container
+            .read(workoutCompletionControllerProvider)
+            .finishWorkout('push'),
+        throwsStateError);
+    await recreate();
+    workouts.failCompletion = false;
+    final Workout? completed = await container
+        .read(workoutCompletionControllerProvider)
+        .finishWorkout('push');
+    expect(completed!.sets.single.weightKg, 82.5);
+    expect(completed.sets.single.reps, 8);
+    expect(completed.conditioningPlan, isNull);
+    expect(completed.conditioningResult, isNull);
+    expect(store.values.containsKey('workouts.draft.v1.push'), isFalse);
+  });
+
   test('strength entries survive provider and repository recreation', () async {
     final WorkoutDraftController controller = await load();
     controller.updateWeight('set-1', '82.5');
@@ -140,6 +173,12 @@ void main() {
 
   test('switching sessions and returning restores only that sessions entries',
       () async {
+    workouts.values['push'] = draftTestWorkout(track: WorkoutTrack.hybrid);
+    workouts.values['pull'] = draftTestWorkout(
+        id: 'pull',
+        name: 'Pull A Hybrid',
+        status: WorkoutStatus.planned,
+        track: WorkoutTrack.hybrid);
     (await load()).updateWeight('set-1', '80');
     await container
         .read(workoutCompletionControllerProvider)

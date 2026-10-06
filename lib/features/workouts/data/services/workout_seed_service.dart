@@ -1,4 +1,3 @@
-import '../../domain/models/conditioning.dart';
 import '../../domain/models/exercise.dart';
 import '../../domain/models/workout.dart';
 import '../../domain/models/workout_set.dart';
@@ -20,10 +19,15 @@ class WorkoutSeedService {
 
   /// Inserts missing Hybrid catalogue entries and templates idempotently.
   ///
-  /// Existing PPL and CrossFit records are neither read as programme state nor
-  /// modified. This makes the migration additive for existing devices.
+  /// Existing PPL, CrossFit, and completed Hybrid records remain unchanged.
+  /// Unfinished Hybrid records lose only their retired conditioning section.
   Future<void> seedIfEmpty() async {
     await _seedMissingHybridData();
+    for (final Workout workout in await _workoutRepository.getAll()) {
+      final Workout cleaned =
+          WorkoutProgram.withoutUnfinishedConditioning(workout);
+      if (!identical(cleaned, workout)) await _workoutRepository.save(cleaned);
+    }
     await _reconcileRecommendedPlannedWorkout();
   }
 
@@ -183,7 +187,6 @@ class WorkoutSeedService {
             3,
             'Target 10–15 reps; rest about 45 sec'),
       ],
-      conditioning: _pushAConditioning(),
     ),
     _hybridWorkout(
       id: 'seed-workout-pull-a-hybrid',
@@ -202,12 +205,6 @@ class WorkoutSeedService {
         _ExercisePrescription('seed-exercise-dumbbell-hammer-curl', 12, 3,
             'Target 10–12 reps; rest about 45 sec'),
       ],
-      conditioning: _conditioning(<ConditioningMovement>[
-        _bodyweight('step-ups', 'Step-ups', 12),
-        _bodyweight('sit-ups', 'Sit-ups', 12),
-        _loaded('kb-swings', 'Kettlebell Swings', 10, 10),
-        _run(),
-      ]),
     ),
     _hybridWorkout(
       id: 'seed-workout-legs-a-hybrid',
@@ -226,12 +223,6 @@ class WorkoutSeedService {
         _ExercisePrescription(
             'seed-exercise-plank', 45, 3, 'Hold 30–45 sec; rest about 45 sec'),
       ],
-      conditioning: _conditioning(<ConditioningMovement>[
-        _bodyweight('push-ups', 'Push-ups', 10),
-        _loaded('db-floor-press', 'Dumbbell Floor Press', 10, null),
-        _bodyweight('sit-ups', 'Sit-ups', 12),
-        _run(),
-      ]),
     ),
     _hybridWorkout(
       id: 'seed-workout-push-b-hybrid',
@@ -253,12 +244,6 @@ class WorkoutSeedService {
             3,
             'Target 10–15 reps; rest about 45 sec'),
       ],
-      conditioning: _conditioning(<ConditioningMovement>[
-        _loaded('goblet-squat', 'Goblet Squat', 12, 10),
-        _bodyweight('step-ups', 'Step-ups', 12),
-        _bodyweight('sit-ups', 'Sit-ups', 12),
-        _run(),
-      ]),
     ),
     _hybridWorkout(
       id: 'seed-workout-pull-b-hybrid',
@@ -277,13 +262,6 @@ class WorkoutSeedService {
         _ExercisePrescription('seed-exercise-alternating-dumbbell-curl', 12, 3,
             'Target 10–12 reps; rest about 45 sec'),
       ],
-      conditioning: _conditioning(<ConditioningMovement>[
-        _bodyweight('push-ups', 'Push-ups', 10),
-        _loaded('goblet-squat', 'Goblet Squat', 10, 10),
-        const ConditioningMovement(
-            id: 'plank', name: 'Plank', notes: '30 sec', isBodyweight: true),
-        _run(),
-      ]),
     ),
     _hybridWorkout(
       id: 'seed-workout-legs-b-hybrid',
@@ -302,12 +280,6 @@ class WorkoutSeedService {
         _ExercisePrescription('seed-exercise-lying-leg-raise', 12, 3,
             'Target 10–15 reps; rest about 45 sec'),
       ],
-      conditioning: _conditioning(<ConditioningMovement>[
-        _loaded('db-row', 'Dumbbell Row', 10, null),
-        _bodyweight('push-ups', 'Push-ups', 10),
-        _bodyweight('sit-ups', 'Sit-ups', 12),
-        _run(),
-      ]),
     ),
   ];
 
@@ -332,7 +304,6 @@ class WorkoutSeedService {
     required String name,
     required String warmUp,
     required List<_ExercisePrescription> prescriptions,
-    required ConditioningPlan conditioning,
   }) {
     return Workout(
       id: id,
@@ -341,7 +312,6 @@ class WorkoutSeedService {
       status: WorkoutStatus.planned,
       track: WorkoutTrack.hybrid,
       warmUp: warmUp,
-      conditioningPlan: conditioning,
       sessionDurationTarget: 'Up to about 60 min',
       exerciseIds: prescriptions
           .map((_ExercisePrescription value) => value.exerciseId)
@@ -360,76 +330,6 @@ class WorkoutSeedService {
               notes: prescription.notes,
             ),
       ],
-    );
-  }
-
-  static ConditioningPlan _pushAConditioning() {
-    return ConditioningPlan(
-      format: ConditioningFormat.roundsForTime,
-      title: '4 rounds for time',
-      prescribedRounds: 4,
-      instructions:
-          '12 Kettlebell Swings\n10 Alternating Kettlebell Reverse Lunges (5 each leg)\n10 Step-ups (5 each leg)\n200 m Run\nStart kettlebell load at 10 kg and keep technique controlled.',
-      movements: <ConditioningMovement>[
-        _loaded('kettlebell-swings', 'Kettlebell Swings', 12, 10),
-        _loaded('kettlebell-reverse-lunges',
-            'Alternating Kettlebell Reverse Lunges', 10, 10),
-        _bodyweight('step-ups', 'Step-ups', 10),
-        _run(),
-      ],
-    );
-  }
-
-  static ConditioningPlan _conditioning(List<ConditioningMovement> movements) {
-    final String instructions = movements.map((ConditioningMovement movement) {
-      if (movement.prescribedReps != null) {
-        return '${movement.prescribedReps} ${movement.name}';
-      }
-      if (movement.prescribedDistance != null) {
-        return '${movement.prescribedDistance!.toStringAsFixed(0)} m '
-            '${movement.name}';
-      }
-      return '${movement.name}${movement.notes == null ? '' : ': ${movement.notes}'}';
-    }).join('\n');
-    return ConditioningPlan(
-      format: ConditioningFormat.roundsForTime,
-      title: '4 rounds for time',
-      prescribedRounds: 4,
-      instructions: instructions,
-      movements: movements,
-    );
-  }
-
-  static ConditioningMovement _bodyweight(String id, String name, int reps) {
-    return ConditioningMovement(
-      id: id,
-      name: name,
-      prescribedReps: reps,
-      isBodyweight: true,
-    );
-  }
-
-  static ConditioningMovement _loaded(
-    String id,
-    String name,
-    int reps,
-    double? load,
-  ) {
-    return ConditioningMovement(
-      id: id,
-      name: name,
-      prescribedReps: reps,
-      prescribedLoad: load,
-    );
-  }
-
-  static ConditioningMovement _run() {
-    return const ConditioningMovement(
-      id: 'run',
-      name: 'Run',
-      prescribedDistance: 200,
-      distanceUnit: DistanceUnit.metres,
-      isBodyweight: true,
     );
   }
 }

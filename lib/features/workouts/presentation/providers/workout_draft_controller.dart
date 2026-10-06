@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/storage/key_value_store.dart';
 import '../../data/repositories/local_workout_draft_repository.dart';
+import '../../domain/models/workout.dart';
 import '../../domain/models/workout_draft.dart';
+import 'today_workout_provider.dart';
 
 /// Shares one serialized write queue across all workout sessions.
 final Provider<LocalWorkoutDraftRepository> workoutDraftRepositoryProvider =
@@ -36,10 +38,21 @@ class WorkoutDraftController extends FamilyAsyncNotifier<WorkoutDraft, String> {
   int _revision = 0;
 
   @override
-  Future<WorkoutDraft> build(String arg) {
+  Future<WorkoutDraft> build(String arg) async {
     _disposed = false;
     ref.onDispose(() => _disposed = true);
-    return ref.watch(workoutDraftRepositoryProvider).load(arg);
+    final LocalWorkoutDraftRepository repository =
+        ref.watch(workoutDraftRepositoryProvider);
+    final Workout? workout =
+        await ref.read(workoutRepositoryProvider).getById(arg);
+    final WorkoutDraft draft = await repository.load(arg);
+    if (workout?.track == WorkoutTrack.hybrid &&
+        (workout?.status == WorkoutStatus.planned ||
+            workout?.status == WorkoutStatus.inProgress)) {
+      // Retire only the removed section; keep every raw strength entry.
+      return draft.copyWith(conditioning: WorkoutConditioningProgress());
+    }
+    return draft;
   }
 
   /// Records raw entered weight.

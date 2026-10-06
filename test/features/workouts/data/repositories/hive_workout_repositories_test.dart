@@ -62,19 +62,10 @@ void main() {
     expect(pushA.sessionDurationTarget, 'Up to about 60 min');
     expect(pushA.exerciseIds, hasLength(5));
     expect(pushA.sets, hasLength(16));
-    expect(pushA.conditioningPlan?.format, ConditioningFormat.roundsForTime);
-    expect(pushA.conditioningPlan?.prescribedRounds, 4);
-    expect(
-      pushA.conditioningPlan?.movements.map(
-        (ConditioningMovement movement) => movement.name,
-      ),
-      equals(<String>[
-        'Kettlebell Swings',
-        'Alternating Kettlebell Reverse Lunges',
-        'Step-ups',
-        'Run',
-      ]),
-    );
+    for (final Workout workout in hybridWorkouts) {
+      expect(workout.conditioningPlan, isNull);
+      expect(workout.conditioningResult, isNull);
+    }
     expect(await repositories.exerciseRepository.getAll(), isNotEmpty);
 
     await seedService.seedIfEmpty();
@@ -137,6 +128,50 @@ void main() {
           .actualLoad,
       10,
     );
+  });
+
+  test(
+      'cleanup preserves completed Hybrid history and stored strength idempotently',
+      () async {
+    final _Repositories repositories = await _openRepositories();
+    final Workout completed = _completedWorkout(
+      id: 'old-hybrid-history',
+      name: 'Push A Hybrid',
+      track: WorkoutTrack.hybrid,
+      completedAt: DateTime.utc(2026, 8, 3),
+      conditioningResult: ConditioningResult(
+          roundsCompleted: 4,
+          additionalReps: 0,
+          completionTime: const Duration(minutes: 9),
+          isCompleted: true),
+    );
+    final Workout active = completed.copyWith(
+        id: 'old-active-hybrid',
+        status: WorkoutStatus.inProgress,
+        completedAt: null);
+    final Workout planned = completed.copyWith(
+        id: 'old-planned-hybrid',
+        name: 'Pull A Hybrid',
+        status: WorkoutStatus.planned,
+        completedAt: null);
+    for (final Workout workout in <Workout>[completed, active, planned]) {
+      await repositories.workoutRepository.save(workout);
+    }
+    final WorkoutSeedService seed = WorkoutSeedService(
+        exerciseRepository: repositories.exerciseRepository,
+        workoutRepository: repositories.workoutRepository);
+    await seed.seedIfEmpty();
+    await seed.seedIfEmpty();
+    expect(
+        await repositories.workoutRepository.getById(completed.id), completed);
+    for (final Workout original in <Workout>[active, planned]) {
+      final Workout saved =
+          (await repositories.workoutRepository.getById(original.id))!;
+      expect(saved,
+          original.copyWith(conditioningPlan: null, conditioningResult: null));
+      expect(saved.sets.single.weightKg, 80);
+      expect(saved.sets.single.reps, 8);
+    }
   });
 
   test('persists completed workout records across a repository reload',

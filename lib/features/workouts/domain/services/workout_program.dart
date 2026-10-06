@@ -155,13 +155,26 @@ class WorkoutProgram {
     return planned.isEmpty ? null : planned.first;
   }
 
+  /// Removes retired Hybrid conditioning only from unfinished sessions.
+  /// Completed and skipped records remain factual history.
+  static Workout withoutUnfinishedConditioning(Workout workout) {
+    if (workout.track != WorkoutTrack.hybrid ||
+        (workout.status != WorkoutStatus.planned &&
+            workout.status != WorkoutStatus.inProgress) ||
+        (workout.conditioningPlan == null &&
+            workout.conditioningResult == null)) {
+      return workout;
+    }
+    return workout.copyWith(conditioningPlan: null, conditioningResult: null);
+  }
+
   /// Creates a clean planned session from a persisted programme [template].
   static Workout createPlannedSession({
     required Workout template,
     required String id,
     required DateTime scheduledDate,
   }) =>
-      template.copyWith(
+      withoutUnfinishedConditioning(template.copyWith(
         id: id,
         scheduledDate: scheduledDate,
         sets: <WorkoutSet>[
@@ -178,7 +191,7 @@ class WorkoutProgram {
         startedAt: null,
         completedAt: null,
         conditioningResult: null,
-      );
+      ));
 
   static int _compareCompletionDescending(Workout first, Workout second) {
     final int result = second.completedAt!.compareTo(first.completedAt!);

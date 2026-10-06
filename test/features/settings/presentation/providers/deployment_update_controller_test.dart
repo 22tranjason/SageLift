@@ -6,6 +6,7 @@ import 'package:sagelift/core/platform/deployment_version_source.dart';
 import 'package:sagelift/core/storage/key_value_store.dart';
 import 'package:sagelift/features/settings/presentation/providers/deployment_update_controller.dart';
 import 'package:sagelift/features/workouts/domain/models/workout_draft.dart';
+import 'package:sagelift/features/workouts/presentation/providers/today_workout_provider.dart';
 import 'package:sagelift/features/workouts/presentation/providers/workout_draft_controller.dart';
 
 import '../../../../support/workout_draft_fakes.dart';
@@ -68,6 +69,8 @@ void main() {
     );
     final ProviderContainer container = ProviderContainer(overrides: <Override>[
       keyValueStoreProvider.overrideWithValue(store),
+      workoutRepositoryProvider
+          .overrideWithValue(DraftWorkoutRepository([draftTestWorkout()])),
       deploymentVersionSourceProvider.overrideWithValue(source),
     ]);
     addTearDown(container.dispose);
@@ -88,6 +91,8 @@ void main() {
     expect(source.reloadedBuildId, '19-new');
     final ProviderContainer restored = ProviderContainer(overrides: <Override>[
       keyValueStoreProvider.overrideWithValue(store),
+      workoutRepositoryProvider
+          .overrideWithValue(DraftWorkoutRepository([draftTestWorkout()])),
     ]);
     addTearDown(restored.dispose);
     final WorkoutDraft draft =
@@ -103,6 +108,8 @@ void main() {
     );
     final ProviderContainer container = ProviderContainer(overrides: <Override>[
       keyValueStoreProvider.overrideWithValue(store),
+      workoutRepositoryProvider
+          .overrideWithValue(DraftWorkoutRepository([draftTestWorkout()])),
       deploymentVersionSourceProvider.overrideWithValue(source),
     ]);
     addTearDown(container.dispose);
