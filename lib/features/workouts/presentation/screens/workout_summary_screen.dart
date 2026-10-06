@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/router/app_router.dart';
 import '../../domain/models/conditioning.dart';
 import '../../domain/services/exercise_progression_service.dart';
+import '../formatters/workout_weight_format.dart';
 import '../providers/workout_completion_controller.dart';
 import '../providers/workout_progression_provider.dart';
 
@@ -237,7 +238,7 @@ class _ConditioningResultCard extends StatelessWidget {
                 '${(time.inSeconds % 60).toString().padLeft(2, '0')}',
               ),
             if (result.weightKg != null)
-              Text('Weight: ${result.weightKg!.toStringAsFixed(0)} kg'),
+              Text('Weight: ${formatWorkoutWeight(result.weightKg)} kg'),
             if (result.scaling != null) Text('Scaling: ${result.scaling}'),
             Text(result.isCompleted ? 'Completed' : 'Not completed'),
           ],

@@ -6,7 +6,9 @@ import '../../domain/models/workout_set.dart';
 import '../../domain/repositories/exercise_repository.dart';
 import '../../domain/repositories/workout_repository.dart';
 import '../../domain/services/exercise_progression_service.dart';
+import '../../domain/services/previous_exercise_workout.dart';
 import 'today_workout_provider.dart';
+import 'workout_history_provider.dart';
 
 /// Identifies the exercise in a workout for which guidance is requested.
 class ExerciseProgressionRequest {
@@ -33,6 +35,31 @@ class ExerciseProgressionRequest {
   int get hashCode => Object.hash(workoutId, exerciseId);
 }
 
+/// Loads previous results within the viewed session's chronological context.
+final FutureProviderFamily<PreviousExercisePerformance?,
+        ExerciseProgressionRequest> previousWorkoutExercisePerformanceProvider =
+    FutureProvider.family<PreviousExercisePerformance?,
+        ExerciseProgressionRequest>(
+  (Ref ref, ExerciseProgressionRequest request) async {
+    ref.watch(workoutDataRevisionProvider);
+    final WorkoutRepository repository = ref.watch(workoutRepositoryProvider);
+    final Workout? current = await repository.getById(request.workoutId);
+    if (current == null) return null;
+    final Workout? previous = previousExerciseWorkout(
+      workouts: await repository.getAll(),
+      exerciseId: request.exerciseId,
+      viewedWorkout: current,
+    );
+    if (previous == null) return null;
+    return PreviousExercisePerformance(
+      workout: previous,
+      sets: _setsForExercise(previous, request.exerciseId)
+          .where((WorkoutSet set) => set.status == WorkoutSetStatus.completed)
+          .toList(growable: false),
+    );
+  },
+);
+
 /// Loads non-persistent next-session guidance for one exercise.
 final FutureProviderFamily<ExerciseProgressionGuidance?,
         ExerciseProgressionRequest> exerciseProgressionGuidanceProvider =
@@ -57,7 +84,7 @@ final FutureProviderFamily<ExerciseProgressionGuidance?,
     final List<WorkoutSet> previousSets = await _previousCompletedSets(
       workoutRepository: workoutRepository,
       exerciseId: request.exerciseId,
-      excludedWorkoutId: request.workoutId,
+      viewedWorkout: workout,
     );
     return const ExerciseProgressionService().suggest(
       programmedSets: programmedSets,
@@ -104,7 +131,7 @@ final FutureProviderFamily<List<WorkoutExerciseProgression>, String>
       final List<WorkoutSet> previousSets = await _previousCompletedSets(
         workoutRepository: workoutRepository,
         exerciseId: exerciseId,
-        excludedWorkoutId: workout.id,
+        viewedWorkout: workout,
       );
       final Exercise? exercise = await exerciseRepository.getById(exerciseId);
       final ExerciseProgressionStatus status = service.classify(
@@ -152,35 +179,15 @@ List<WorkoutSet> _setsForExercise(Workout workout, String exerciseId) {
 Future<List<WorkoutSet>> _previousCompletedSets({
   required WorkoutRepository workoutRepository,
   required String exerciseId,
-  required String excludedWorkoutId,
+  required Workout viewedWorkout,
 }) async {
-  final List<Workout> completedWorkouts = (await workoutRepository.getAll())
-      .where(
-        (Workout workout) =>
-            workout.id != excludedWorkoutId &&
-            workout.status == WorkoutStatus.completed,
-      )
-      .toList()
-    ..sort(_compareByCompletionDateDescending);
-
-  for (final Workout workout in completedWorkouts) {
-    final List<WorkoutSet> completedSets = _setsForExercise(
-      workout,
-      exerciseId,
-    )
-        .where((WorkoutSet set) => set.status == WorkoutSetStatus.completed)
-        .toList(
-          growable: false,
-        );
-    if (completedSets.isNotEmpty) return completedSets;
-  }
-  return const <WorkoutSet>[];
-}
-
-int _compareByCompletionDateDescending(Workout first, Workout second) {
-  return _completionDate(second).compareTo(_completionDate(first));
-}
-
-DateTime _completionDate(Workout workout) {
-  return workout.completedAt ?? workout.startedAt ?? workout.scheduledDate;
+  final Workout? previous = previousExerciseWorkout(
+    workouts: await workoutRepository.getAll(),
+    exerciseId: exerciseId,
+    viewedWorkout: viewedWorkout,
+  );
+  if (previous == null) return const <WorkoutSet>[];
+  return _setsForExercise(previous, exerciseId)
+      .where((WorkoutSet set) => set.status == WorkoutSetStatus.completed)
+      .toList(growable: false);
 }

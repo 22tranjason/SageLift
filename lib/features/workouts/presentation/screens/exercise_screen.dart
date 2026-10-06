@@ -11,6 +11,7 @@ import '../../domain/models/workout.dart';
 import '../../domain/models/workout_draft.dart';
 import '../../domain/models/workout_set.dart';
 import '../../domain/services/exercise_progression_service.dart';
+import '../formatters/workout_weight_format.dart';
 import '../providers/today_workout_provider.dart';
 import '../providers/workout_completion_controller.dart';
 import '../providers/workout_draft_controller.dart';
@@ -129,7 +130,9 @@ class _ExerciseContent extends ConsumerWidget {
     final AsyncValue<void> draftSave =
         ref.watch(workoutDraftSaveProvider(workoutId));
     final AsyncValue<PreviousExercisePerformance?> previousPerformance =
-        ref.watch(previousExercisePerformanceProvider(exercise.id));
+        ref.watch(previousWorkoutExercisePerformanceProvider(
+      ExerciseProgressionRequest(workoutId: workoutId, exerciseId: exercise.id),
+    ));
     final ExerciseProgressionService progressionService =
         const ExerciseProgressionService();
     final RepRange? repRange =
@@ -182,13 +185,19 @@ class _ExerciseContent extends ConsumerWidget {
           previousPerformance.when(
             loading: () => const SizedBox.shrink(),
             error: (Object error, StackTrace stackTrace) {
-              return const Text('No previous workout.');
+              return const Text('Unable to load previous results.');
             },
             data: (PreviousExercisePerformance? performance) {
               if (performance == null) {
                 return const Text('No previous workout.');
               }
-              return _PreviousPerformanceCard(performance: performance);
+              final DateTime date = (performance.workout.completedAt ??
+                      performance.workout.startedAt ??
+                      performance.workout.scheduledDate)
+                  .toLocal();
+              return Text(
+                  'Last session: ${date.day}/${date.month}/${date.year}',
+                  style: Theme.of(context).textTheme.bodySmall);
             },
           ),
           const SizedBox(height: 8),
@@ -199,7 +208,14 @@ class _ExerciseContent extends ConsumerWidget {
             },
             data: (ExerciseProgressionGuidance? value) {
               if (value == null) return const SizedBox.shrink();
-              return _SuggestedTodayCard(guidance: value);
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text('Suggested today',
+                      style: Theme.of(context).textTheme.titleSmall),
+                  Text(value.message),
+                ],
+              );
             },
           ),
           const SizedBox(height: 8),
@@ -208,6 +224,9 @@ class _ExerciseContent extends ConsumerWidget {
               set: set,
               repRange: progressionService.repRangeFor(set)?.display,
               progress: progress[set.id] ?? const WorkoutSetProgress(),
+              previousSet:
+                  _previousSet(previousPerformance.valueOrNull, set.setNumber),
+              suggestion: _setSuggestion(guidance.valueOrNull, set.setNumber),
               onWeightChanged: (String weight) {
                 controller.updateWeight(set.id, weight);
               },
@@ -580,7 +599,7 @@ class _PreviousConditioningCard extends StatelessWidget {
     if (recorded?.actualLoad != null) {
       final int count = recorded?.implementCount ?? movement.implementCount;
       final String prefix = count > 1 ? '$count × ' : '';
-      return '${movement.name}: $prefix${recorded!.actualLoad!.toStringAsFixed(0)} kg';
+      return '${movement.name}: $prefix${formatWorkoutWeight(recorded!.actualLoad)} kg';
     }
     return '${movement.name}: '
         '${movement.isBodyweight ? 'Bodyweight' : 'No load recorded'}';
@@ -696,72 +715,21 @@ class _ConditioningFieldState extends State<_ConditioningField> {
   }
 }
 
-class _PreviousPerformanceCard extends StatelessWidget {
-  const _PreviousPerformanceCard({required this.performance});
-
-  final PreviousExercisePerformance performance;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            const Text('Last time'),
-            const SizedBox(height: 4),
-            for (final WorkoutSet set in performance.sets) Text(_setLabel(set)),
-            const SizedBox(height: 4),
-            const Text('Let\'s beat that 💪'),
-          ],
-        ),
-      ),
-    );
+WorkoutSet? _previousSet(
+    PreviousExercisePerformance? performance, int setNumber) {
+  for (final WorkoutSet set in performance?.sets ?? const <WorkoutSet>[]) {
+    if (set.setNumber == setNumber) return set;
   }
-
-  String _setLabel(WorkoutSet set) {
-    final String weight = set.weightKg?.toStringAsFixed(0) ?? '—';
-    final String reps = set.reps?.toString() ?? '—';
-    return '$weight kg × $reps reps';
-  }
+  return null;
 }
 
-class _SuggestedTodayCard extends StatelessWidget {
-  const _SuggestedTodayCard({required this.guidance});
-
-  final ExerciseProgressionGuidance guidance;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            const Text('Suggested today'),
-            const SizedBox(height: 4),
-            Text(guidance.message),
-            const SizedBox(height: 4),
-            for (final SetProgressionSuggestion suggestion
-                in guidance.setSuggestions)
-              Text(_suggestionLabel(suggestion)),
-          ],
-        ),
-      ),
-    );
+SetProgressionSuggestion? _setSuggestion(
+    ExerciseProgressionGuidance? guidance, int setNumber) {
+  for (final SetProgressionSuggestion suggestion
+      in guidance?.setSuggestions ?? const <SetProgressionSuggestion>[]) {
+    if (suggestion.setNumber == setNumber) return suggestion;
   }
-
-  String _suggestionLabel(SetProgressionSuggestion suggestion) {
-    final String reps = suggestion.targetReps == null
-        ? 'Use a comfortable rep target'
-        : '${suggestion.targetReps} reps';
-    final String weight = suggestion.suggestedWeightKg == null
-        ? ''
-        : '${suggestion.suggestedWeightKg!.toStringAsFixed(0)} kg × ';
-    return 'Set ${suggestion.setNumber}: $weight$reps';
-  }
+  return null;
 }
 
 class _SetEntryCard extends StatelessWidget {
@@ -769,6 +737,8 @@ class _SetEntryCard extends StatelessWidget {
     required this.set,
     required this.repRange,
     required this.progress,
+    required this.previousSet,
+    required this.suggestion,
     required this.onWeightChanged,
     required this.onRepsChanged,
   });
@@ -776,6 +746,8 @@ class _SetEntryCard extends StatelessWidget {
   final WorkoutSet set;
   final String? repRange;
   final WorkoutSetProgress progress;
+  final WorkoutSet? previousSet;
+  final SetProgressionSuggestion? suggestion;
   final ValueChanged<String> onWeightChanged;
   final ValueChanged<String> onRepsChanged;
 
@@ -787,9 +759,23 @@ class _SetEntryCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text(
-              'Set ${set.setNumber}',
-              style: Theme.of(context).textTheme.titleSmall,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text('Set ${set.setNumber}',
+                    style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    previousSet == null
+                        ? 'Last: —'
+                        : 'Last: ${formatWorkoutWeight(previousSet!.weightKg)} kg × ${previousSet!.reps ?? '—'} reps',
+                    key: ValueKey<String>('previous-${set.id}'),
+                    textAlign: TextAlign.end,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 4),
             Row(
@@ -801,8 +787,12 @@ class _SetEntryCard extends StatelessWidget {
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
-                    decoration: const InputDecoration(
-                      labelText: 'Weight',
+                    decoration: InputDecoration(
+                      labelText: 'Weight (kg)',
+                      floatingLabelBehavior: FloatingLabelBehavior.always,
+                      hintText: suggestion?.suggestedWeightKg == null
+                          ? null
+                          : formatWorkoutWeight(suggestion!.suggestedWeightKg),
                       isDense: true,
                     ),
                     onChanged: onWeightChanged,
@@ -816,7 +806,8 @@ class _SetEntryCard extends StatelessWidget {
                     keyboardType: TextInputType.number,
                     decoration: InputDecoration(
                       labelText: 'Reps',
-                      hintText: repRange,
+                      floatingLabelBehavior: FloatingLabelBehavior.always,
+                      hintText: suggestion?.targetReps?.toString() ?? repRange,
                       isDense: true,
                     ),
                     onChanged: onRepsChanged,

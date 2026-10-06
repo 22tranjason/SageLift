@@ -75,6 +75,10 @@ void main() {
     expect(find.text('Barbell Bench Press'), findsOneWidget);
     expect(find.text('Incline Dumbbell Press'), findsOneWidget);
     expect(find.text('Start Workout'), findsOneWidget);
+    expect(tester.getTopLeft(find.text('Start Workout')).dy,
+        lessThan(tester.getTopLeft(find.text('Choose Workout')).dy));
+    expect(tester.getTopLeft(find.text('Start Workout')).dy,
+        lessThan(tester.getTopLeft(find.text('Barbell Bench Press')).dy));
     expect(find.text('Last Workout'), findsNothing);
 
     await tester.tap(find.text('Choose Workout'));
@@ -184,7 +188,7 @@ void main() {
     expect(find.text('Target reps: 10'), findsNothing);
     expect(find.byType(CheckboxListTile), findsNothing);
     expect(find.text('Reps'), findsNWidgets(2));
-    expect(find.text('6–10'), findsNWidgets(2));
+    expect(find.text('10'), findsNWidgets(2));
     expect(find.text('Suggested today'), findsOneWidget);
     expect(
       find.text('First session — choose a comfortable starting weight.'),
@@ -469,7 +473,7 @@ void main() {
       exerciseId: benchPress.id,
       startedAt: DateTime.utc(2026, 7, 30, 6),
       completedAt: DateTime.utc(2026, 7, 30, 6, 30),
-      weightKg: 80,
+      weightKg: 82.5,
       reps: 10,
     );
 
@@ -504,7 +508,7 @@ void main() {
     );
     expect(find.text('Duration: 30 min'), findsOneWidget);
     expect(find.text('Sets: 1 • Reps: 10'), findsOneWidget);
-    expect(find.text('Volume: 800 kg'), findsOneWidget);
+    expect(find.text('Volume: 825 kg'), findsOneWidget);
 
     await tester.tap(
       find.byKey(const ValueKey<String>('history-workout-history-newer')),
@@ -519,7 +523,7 @@ void main() {
     expect(find.text('Completed exercises'), findsOneWidget);
     expect(find.text('Barbell Bench Press'), findsOneWidget);
     expect(find.text('Completed sets'), findsOneWidget);
-    expect(find.text('80 kg × 10 reps'), findsOneWidget);
+    expect(find.text('82.5 kg × 10 reps'), findsOneWidget);
   });
 
   testWidgets('Exercise shows its most recent persisted previous performance', (
@@ -555,7 +559,7 @@ void main() {
       exerciseId: benchPress.id,
       startedAt: DateTime.utc(2026, 7, 28, 6),
       completedAt: DateTime.utc(2026, 7, 28, 6, 30),
-      weightKg: 75,
+      weightKg: 82.5,
       reps: 9,
     );
 
@@ -585,15 +589,26 @@ void main() {
     await tester.tap(find.text('Barbell Bench Press'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Last time'), findsOneWidget);
-    expect(find.text('75 kg × 9 reps'), findsOneWidget);
-    expect(find.text('Let\'s beat that 💪'), findsOneWidget);
+    expect(find.text('Last session: 28/7/2026'), findsOneWidget);
+    expect(find.text('Last: 82.5 kg × 9 reps'), findsOneWidget);
+    expect(find.text('Let\'s beat that 💪'), findsNothing);
     expect(find.text('Suggested today'), findsOneWidget);
     expect(
       find.text('Keep the same weight and add one rep where practical.'),
       findsOneWidget,
     );
-    expect(find.text('Set 1: 75 kg × 10 reps'), findsOneWidget);
+    final TextField weightField = tester.widget<TextField>(find.descendant(
+        of: find.byKey(const ValueKey<String>('weight-active-set')),
+        matching: find.byType(TextField)));
+    expect(weightField.decoration!.hintText, '82.5');
+    expect(
+        tester
+            .widget<TextField>(find.descendant(
+                of: find.byKey(const ValueKey<String>('reps-active-set')),
+                matching: find.byType(TextField)))
+            .decoration!
+            .hintText,
+        '10');
 
     await tester.enterText(
       find.byKey(const ValueKey<String>('weight-active-set')),

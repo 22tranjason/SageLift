@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/router/app_router.dart';
 import '../../domain/models/conditioning.dart';
 import '../../domain/models/workout.dart';
+import '../formatters/workout_weight_format.dart';
 import '../providers/workout_completion_controller.dart';
 import '../providers/workout_history_provider.dart';
 
@@ -166,7 +167,7 @@ class WorkoutDetailsScreen extends ConsumerWidget {
   }
 
   String _setLabel(CompletedSetDetail setDetail) {
-    final String weight = setDetail.set.weightKg?.toStringAsFixed(0) ?? '—';
+    final String weight = formatWorkoutWeight(setDetail.set.weightKg);
     final String reps = setDetail.set.reps?.toString() ?? '—';
     return '$weight kg × $reps reps';
   }
@@ -236,7 +237,7 @@ class _ConditioningDetail extends StatelessWidget {
               Text('Time: ${result.completionTime!.inMinutes}:'
                   '${(result.completionTime!.inSeconds % 60).toString().padLeft(2, '0')}'),
             if (result.weightKg != null)
-              Text('Weight: ${result.weightKg!.toStringAsFixed(0)} kg'),
+              Text('Weight: ${formatWorkoutWeight(result.weightKg)} kg'),
             if (result.scaling != null) Text('Scaling: ${result.scaling}'),
             Text(result.isCompleted ? 'Completed' : 'Not completed'),
           ],

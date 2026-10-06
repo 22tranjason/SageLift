@@ -238,18 +238,16 @@ class ExerciseProgressionService {
     required List<WorkoutSet> previousCompletedSets,
     required RepRange? range,
   }) {
+    final Map<int, WorkoutSet> previousByNumber = <int, WorkoutSet>{
+      for (final WorkoutSet set in previousCompletedSets) set.setNumber: set,
+    };
     final List<SetProgressionSuggestion> suggestions =
         <SetProgressionSuggestion>[
-      for (int index = 0; index < programmedSets.length; index++)
+      for (final WorkoutSet set in programmedSets)
         SetProgressionSuggestion(
-          setNumber: programmedSets[index].setNumber,
-          targetReps: index < previousCompletedSets.length
-              ? previousCompletedSets[index].reps ??
-                  programmedSets[index].targetReps
-              : programmedSets[index].targetReps,
-          suggestedWeightKg: index < previousCompletedSets.length
-              ? previousCompletedSets[index].weightKg
-              : null,
+          setNumber: set.setNumber,
+          targetReps: previousByNumber[set.setNumber]?.reps ?? set.targetReps,
+          suggestedWeightKg: previousByNumber[set.setNumber]?.weightKg,
         ),
     ];
     if (range == null) return suggestions;

@@ -26,6 +26,18 @@ class TodayScreen extends ConsumerWidget {
     );
     final DateTime now = DateTime.now();
 
+    final Widget chooseWorkoutButton = Align(
+      alignment: Alignment.centerRight,
+      child: TextButton.icon(
+        key: const ValueKey<String>('choose-workout-button'),
+        onPressed: () {
+          unawaited(_chooseWorkout(context, ref));
+        },
+        icon: const Icon(Icons.swap_horiz),
+        label: const Text('Choose Workout'),
+      ),
+    );
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Today'),
@@ -62,26 +74,26 @@ class TodayScreen extends ConsumerWidget {
                 'Next Workout',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  key: const ValueKey<String>('choose-workout-button'),
-                  onPressed: () {
-                    unawaited(_chooseWorkout(context, ref));
-                  },
-                  icon: const Icon(Icons.swap_horiz),
-                  label: const Text('Choose Workout'),
-                ),
-              ),
-              const SizedBox(height: 8),
               todayWorkout.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (Object error, StackTrace stackTrace) {
-                  return const Text('Unable to load the next workout.');
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      const Text('Unable to load the next workout.'),
+                      chooseWorkoutButton,
+                    ],
+                  );
                 },
                 data: (TodayWorkout? workoutData) {
                   if (workoutData == null) {
-                    return const Text('No workout is available yet.');
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        const Text('No workout is available yet.'),
+                        chooseWorkoutButton,
+                      ],
+                    );
                   }
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -90,16 +102,7 @@ class TodayScreen extends ConsumerWidget {
                         workoutData.workout.name,
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
-                      Text(
-                        workoutData.isRecommended
-                            ? 'Recommended next'
-                            : 'Recommended next: '
-                                '${workoutData.recommendedWorkoutName}',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
                       const SizedBox(height: 8),
-                      WorkoutExerciseList(exercises: workoutData.exercises),
-                      const SizedBox(height: 16),
                       SizedBox(
                         width: double.infinity,
                         child: FilledButton(
@@ -136,6 +139,18 @@ class TodayScreen extends ConsumerWidget {
                           ),
                         ),
                       ),
+                      const SizedBox(height: 8),
+                      Text(
+                        workoutData.isRecommended
+                            ? 'Recommended next'
+                            : 'Recommended next: '
+                                '${workoutData.recommendedWorkoutName}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 4),
+                      chooseWorkoutButton,
+                      const SizedBox(height: 8),
+                      WorkoutExerciseList(exercises: workoutData.exercises),
                     ],
                   );
                 },
