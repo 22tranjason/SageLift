@@ -33,7 +33,7 @@ void main() {
     );
     final Workout workout = Workout(
       id: 'seed-workout-push-a',
-      name: 'Push A Hybrid',
+      name: 'Chest + Triceps',
       scheduledDate: DateTime.utc(2000),
       status: WorkoutStatus.planned,
       track: WorkoutTrack.hybrid,
@@ -71,20 +71,26 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Good Morning Jason'), findsOneWidget);
-    expect(find.text('Push A Hybrid'), findsOneWidget);
+    expect(find.textContaining('Thu: Rest'), findsOneWidget);
+    expect(find.textContaining('Rest days do not advance'), findsOneWidget);
+    expect(find.text('Chest + Triceps'), findsOneWidget);
     expect(find.text('Barbell Bench Press'), findsOneWidget);
     expect(find.text('Incline Dumbbell Press'), findsOneWidget);
     expect(find.text('Start Workout'), findsOneWidget);
-    expect(tester.getTopLeft(find.text('Start Workout')).dy,
-        lessThan(tester.getTopLeft(find.text('Choose Workout')).dy));
-    expect(tester.getTopLeft(find.text('Start Workout')).dy,
-        lessThan(tester.getTopLeft(find.text('Barbell Bench Press')).dy));
+    expect(
+      tester.getTopLeft(find.text('Start Workout')).dy,
+      lessThan(tester.getTopLeft(find.text('Choose Workout')).dy),
+    );
+    expect(
+      tester.getTopLeft(find.text('Start Workout')).dy,
+      lessThan(tester.getTopLeft(find.text('Barbell Bench Press')).dy),
+    );
     expect(find.text('Last Workout'), findsNothing);
 
     await tester.tap(find.text('Choose Workout'));
     await tester.pumpAndSettle();
-    expect(find.text('Push A Hybrid'), findsNWidgets(2));
-    expect(find.text('Legs B Hybrid'), findsOneWidget);
+    expect(find.text('Chest + Triceps'), findsNWidgets(2));
+    expect(find.text('Legs + Calves'), findsOneWidget);
     expect(find.text('Push A'), findsNothing);
     expect(find.text('CrossFit A'), findsNothing);
     await tester.tapAt(const Offset(8, 8));
@@ -122,7 +128,7 @@ void main() {
     );
     final Workout workout = Workout(
       id: 'push-a',
-      name: 'Push A Hybrid',
+      name: 'Chest + Triceps',
       scheduledDate: DateTime.utc(2000),
       status: WorkoutStatus.planned,
       track: WorkoutTrack.hybrid,
@@ -259,166 +265,166 @@ void main() {
     );
   });
 
-  testWidgets('finishing a workout persists it and shows accurate summary data',
-      (
-    WidgetTester tester,
-  ) async {
-    const Exercise benchPress = Exercise(
-      id: 'completion-bench-press',
-      name: 'Barbell Bench Press',
-      category: ExerciseCategory.strength,
-      equipment: Equipment.barbell,
-    );
-    const Exercise row = Exercise(
-      id: 'completion-row',
-      name: 'Barbell Row',
-      category: ExerciseCategory.strength,
-      equipment: Equipment.barbell,
-    );
-    final Workout workout = Workout(
-      id: 'completion-push-a',
-      name: 'Push A Hybrid',
-      scheduledDate: DateTime.utc(2026, 7, 30),
-      status: WorkoutStatus.planned,
-      track: WorkoutTrack.hybrid,
-      exerciseIds: <String>[benchPress.id, row.id],
-      sets: <WorkoutSet>[
-        WorkoutSet(
-          id: 'completion-bench-1',
-          exerciseId: benchPress.id,
-          setNumber: 1,
-          targetReps: 10,
-          status: WorkoutSetStatus.planned,
-        ),
-        WorkoutSet(
-          id: 'completion-row-1',
-          exerciseId: row.id,
-          setNumber: 1,
-          targetReps: 8,
-          status: WorkoutSetStatus.planned,
-        ),
-      ],
-    );
-    final Workout nextWorkout = Workout(
-      id: 'completion-pull-a',
-      name: 'Pull A Hybrid',
-      scheduledDate: DateTime.utc(2026, 7, 31),
-      status: WorkoutStatus.planned,
-      track: WorkoutTrack.hybrid,
-      exerciseIds: <String>[row.id],
-      sets: <WorkoutSet>[
-        WorkoutSet(
-          id: 'completion-pull-row-1',
-          exerciseId: row.id,
-          setNumber: 1,
-          targetReps: 8,
-          status: WorkoutSetStatus.planned,
-        ),
-      ],
-    );
-    final _FakeWorkoutRepository workoutRepository = _FakeWorkoutRepository(
-      <Workout>[workout, nextWorkout],
-    );
-
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: <Override>[
-          keyValueStoreProvider.overrideWithValue(_InMemoryKeyValueStore()),
-          dailyCheckInRepositoryProvider.overrideWithValue(
-            _FakeDailyCheckInRepository(),
+  testWidgets(
+    'finishing a workout persists it and shows accurate summary data',
+    (WidgetTester tester) async {
+      const Exercise benchPress = Exercise(
+        id: 'completion-bench-press',
+        name: 'Barbell Bench Press',
+        category: ExerciseCategory.strength,
+        equipment: Equipment.barbell,
+      );
+      const Exercise row = Exercise(
+        id: 'completion-row',
+        name: 'Barbell Row',
+        category: ExerciseCategory.strength,
+        equipment: Equipment.barbell,
+      );
+      final Workout workout = Workout(
+        id: 'completion-push-a',
+        name: 'Chest + Triceps',
+        scheduledDate: DateTime.utc(2026, 7, 30),
+        status: WorkoutStatus.planned,
+        track: WorkoutTrack.hybrid,
+        exerciseIds: <String>[benchPress.id, row.id],
+        sets: <WorkoutSet>[
+          WorkoutSet(
+            id: 'completion-bench-1',
+            exerciseId: benchPress.id,
+            setNumber: 1,
+            targetReps: 10,
+            status: WorkoutSetStatus.planned,
           ),
-          habitRepositoryProvider.overrideWithValue(_FakeHabitRepository()),
-          exerciseRepositoryProvider.overrideWithValue(
-            _FakeExerciseRepository(<Exercise>[benchPress, row]),
+          WorkoutSet(
+            id: 'completion-row-1',
+            exerciseId: row.id,
+            setNumber: 1,
+            targetReps: 8,
+            status: WorkoutSetStatus.planned,
           ),
-          workoutRepositoryProvider.overrideWithValue(workoutRepository),
         ],
-        child: const SageLiftApp(),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      final Workout nextWorkout = Workout(
+        id: 'completion-pull-a',
+        name: 'Back + Biceps',
+        scheduledDate: DateTime.utc(2026, 7, 31),
+        status: WorkoutStatus.planned,
+        track: WorkoutTrack.hybrid,
+        exerciseIds: <String>[row.id],
+        sets: <WorkoutSet>[
+          WorkoutSet(
+            id: 'completion-pull-row-1',
+            exerciseId: row.id,
+            setNumber: 1,
+            targetReps: 8,
+            status: WorkoutSetStatus.planned,
+          ),
+        ],
+      );
+      final _FakeWorkoutRepository workoutRepository = _FakeWorkoutRepository(
+        <Workout>[workout, nextWorkout],
+      );
 
-    await tester.ensureVisible(find.text('Start Workout'));
-    await tester.tap(find.text('Start Workout'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Barbell Bench Press'));
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: <Override>[
+            keyValueStoreProvider.overrideWithValue(_InMemoryKeyValueStore()),
+            dailyCheckInRepositoryProvider.overrideWithValue(
+              _FakeDailyCheckInRepository(),
+            ),
+            habitRepositoryProvider.overrideWithValue(_FakeHabitRepository()),
+            exerciseRepositoryProvider.overrideWithValue(
+              _FakeExerciseRepository(<Exercise>[benchPress, row]),
+            ),
+            workoutRepositoryProvider.overrideWithValue(workoutRepository),
+          ],
+          child: const SageLiftApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.text('Finish Workout'), findsNothing);
+      await tester.ensureVisible(find.text('Start Workout'));
+      await tester.tap(find.text('Start Workout'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Barbell Bench Press'));
+      await tester.pumpAndSettle();
 
-    await tester.enterText(
-      find.byKey(const ValueKey<String>('weight-completion-bench-1')),
-      '80',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey<String>('reps-completion-bench-1')),
-      '10',
-    );
-    await tester.ensureVisible(find.text('Next Exercise'));
-    await tester.tap(find.text('Next Exercise'));
-    await tester.pumpAndSettle();
+      expect(find.text('Finish Workout'), findsNothing);
 
-    expect(find.text('Finish Workout'), findsOneWidget);
-    await tester.enterText(
-      find.byKey(const ValueKey<String>('weight-completion-row-1')),
-      '50',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey<String>('reps-completion-row-1')),
-      '8',
-    );
-    await tester.ensureVisible(find.text('Finish Workout'));
-    await tester.tap(
-      find.byKey(const ValueKey<String>('finish-workout-button')),
-    );
-    await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey<String>('weight-completion-bench-1')),
+        '80',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey<String>('reps-completion-bench-1')),
+        '10',
+      );
+      await tester.ensureVisible(find.text('Next Exercise'));
+      await tester.tap(find.text('Next Exercise'));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Workout Summary'), findsOneWidget);
-    expect(find.text('Exercises completed'), findsOneWidget);
-    expect(find.text('2'), findsNWidgets(2));
-    expect(find.text('Sets completed'), findsOneWidget);
-    expect(find.text('Total reps'), findsOneWidget);
-    expect(find.text('18'), findsOneWidget);
-    expect(find.text('Total volume'), findsOneWidget);
-    expect(find.text('1200 kg'), findsOneWidget);
-    expect(find.text('Barbell Bench Press'), findsNWidgets(2));
-    expect(find.text('Barbell Row'), findsNWidgets(2));
-    expect(find.text('Progress since last time'), findsOneWidget);
-    expect(find.text('First session'), findsNWidgets(2));
+      expect(find.text('Finish Workout'), findsOneWidget);
+      await tester.enterText(
+        find.byKey(const ValueKey<String>('weight-completion-row-1')),
+        '50',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey<String>('reps-completion-row-1')),
+        '8',
+      );
+      await tester.ensureVisible(find.text('Finish Workout'));
+      await tester.tap(
+        find.byKey(const ValueKey<String>('finish-workout-button')),
+      );
+      await tester.pumpAndSettle();
 
-    final Workout? completedWorkout = await workoutRepository.getById(
-      workout.id,
-    );
-    expect(completedWorkout?.status, WorkoutStatus.completed);
-    expect(completedWorkout?.startedAt, isNotNull);
-    expect(completedWorkout?.completedAt, isNotNull);
-    expect(completedWorkout?.sets[0].weightKg, 80);
-    expect(completedWorkout?.sets[0].reps, 10);
-    expect(
-      find.text(_summaryDateLabel(completedWorkout!.startedAt!)),
-      findsOneWidget,
-    );
-    expect(
-      find.text(_summaryTimeLabel(completedWorkout.startedAt!)),
-      findsAtLeastNWidgets(1),
-    );
-    expect(
-      find.text(_summaryTimeLabel(completedWorkout.completedAt!)),
-      findsAtLeastNWidgets(1),
-    );
+      expect(find.text('Workout Summary'), findsOneWidget);
+      expect(find.text('Exercises completed'), findsOneWidget);
+      expect(find.text('2'), findsNWidgets(2));
+      expect(find.text('Sets completed'), findsOneWidget);
+      expect(find.text('Total reps'), findsOneWidget);
+      expect(find.text('18'), findsOneWidget);
+      expect(find.text('Total volume'), findsOneWidget);
+      expect(find.text('1200 kg'), findsOneWidget);
+      expect(find.text('Barbell Bench Press'), findsNWidgets(2));
+      expect(find.text('Barbell Row'), findsNWidgets(2));
+      expect(find.text('Progress since last time'), findsOneWidget);
+      expect(find.text('First session'), findsNWidgets(2));
 
-    await tester.ensureVisible(find.text('Done'));
-    await tester.tap(find.text('Done'));
-    await tester.pumpAndSettle();
+      final Workout? completedWorkout = await workoutRepository.getById(
+        workout.id,
+      );
+      expect(completedWorkout?.status, WorkoutStatus.completed);
+      expect(completedWorkout?.startedAt, isNotNull);
+      expect(completedWorkout?.completedAt, isNotNull);
+      expect(completedWorkout?.sets[0].weightKg, 80);
+      expect(completedWorkout?.sets[0].reps, 10);
+      expect(
+        find.text(_summaryDateLabel(completedWorkout!.startedAt!)),
+        findsOneWidget,
+      );
+      expect(
+        find.text(_summaryTimeLabel(completedWorkout.startedAt!)),
+        findsAtLeastNWidgets(1),
+      );
+      expect(
+        find.text(_summaryTimeLabel(completedWorkout.completedAt!)),
+        findsAtLeastNWidgets(1),
+      );
 
-    expect(find.text('Today'), findsOneWidget);
-    expect(find.text('Next Workout'), findsOneWidget);
-    expect(find.text('Pull A Hybrid'), findsOneWidget);
-    expect(find.text('Last Workout'), findsOneWidget);
-    expect(find.text('Push A Hybrid'), findsOneWidget);
-    expect(find.text('Completed today'), findsOneWidget);
-    expect(find.text('Start Workout'), findsOneWidget);
-  });
+      await tester.ensureVisible(find.text('Done'));
+      await tester.tap(find.text('Done'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Today'), findsOneWidget);
+      expect(find.text('Next Workout'), findsOneWidget);
+      expect(find.text('Back + Biceps'), findsOneWidget);
+      expect(find.text('Last Workout'), findsOneWidget);
+      expect(find.text('Chest + Triceps'), findsOneWidget);
+      expect(find.text('Completed today'), findsOneWidget);
+      expect(find.text('Start Workout'), findsOneWidget);
+    },
+  );
 
   testWidgets('History shows an empty state without completed workouts', (
     WidgetTester tester,
@@ -537,7 +543,7 @@ void main() {
     );
     final Workout activeWorkout = Workout(
       id: 'active-workout',
-      name: 'Push A Hybrid',
+      name: 'Chest + Triceps',
       scheduledDate: DateTime.utc(2026, 7, 30),
       status: WorkoutStatus.planned,
       track: WorkoutTrack.hybrid,
@@ -597,18 +603,25 @@ void main() {
       find.text('Keep the same weight and add one rep where practical.'),
       findsOneWidget,
     );
-    final TextField weightField = tester.widget<TextField>(find.descendant(
+    final TextField weightField = tester.widget<TextField>(
+      find.descendant(
         of: find.byKey(const ValueKey<String>('weight-active-set')),
-        matching: find.byType(TextField)));
+        matching: find.byType(TextField),
+      ),
+    );
     expect(weightField.decoration!.hintText, '82.5');
     expect(
-        tester
-            .widget<TextField>(find.descendant(
-                of: find.byKey(const ValueKey<String>('reps-active-set')),
-                matching: find.byType(TextField)))
-            .decoration!
-            .hintText,
-        '10');
+      tester
+          .widget<TextField>(
+            find.descendant(
+              of: find.byKey(const ValueKey<String>('reps-active-set')),
+              matching: find.byType(TextField),
+            ),
+          )
+          .decoration!
+          .hintText,
+      '10',
+    );
 
     await tester.enterText(
       find.byKey(const ValueKey<String>('weight-active-set')),
@@ -721,10 +734,8 @@ class _FakeExerciseRepository implements ExerciseRepository {
   _FakeExerciseRepository(List<Exercise> exercises)
       : _exercises = Map<String, Exercise>.fromEntries(
           exercises.map(
-            (Exercise exercise) => MapEntry<String, Exercise>(
-              exercise.id,
-              exercise,
-            ),
+            (Exercise exercise) =>
+                MapEntry<String, Exercise>(exercise.id, exercise),
           ),
         );
 
@@ -750,9 +761,8 @@ class _FakeExerciseRepository implements ExerciseRepository {
   Future<List<Exercise>> searchByName(String query) async {
     return _exercises.values
         .where(
-          (Exercise exercise) => exercise.name.toLowerCase().contains(
-                query.toLowerCase(),
-              ),
+          (Exercise exercise) =>
+              exercise.name.toLowerCase().contains(query.toLowerCase()),
         )
         .toList();
   }
@@ -808,10 +818,7 @@ class _FakeWorkoutRepository implements WorkoutRepository {
   _FakeWorkoutRepository(List<Workout> workouts)
       : _workouts = Map<String, Workout>.fromEntries(
           workouts.map(
-            (Workout workout) => MapEntry<String, Workout>(
-              workout.id,
-              workout,
-            ),
+            (Workout workout) => MapEntry<String, Workout>(workout.id, workout),
           ),
         );
 

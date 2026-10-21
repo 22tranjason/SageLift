@@ -69,6 +69,11 @@ class TodayScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 4),
               Text(_dateLabel(now)),
+              const SizedBox(height: 8),
+              const Text(WorkoutProgram.weeklySchedule),
+              const Text(
+                'Suggested week; the next workout follows completed sessions. Rest days do not advance the rotation.',
+              ),
               const SizedBox(height: 24),
               Text(
                 'Next Workout',
