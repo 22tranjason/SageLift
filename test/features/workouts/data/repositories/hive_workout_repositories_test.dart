@@ -2,17 +2,22 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:sagelift/core/storage/key_value_store.dart';
 import 'package:sagelift/features/workouts/data/adapters/workout_hive_adapters.dart';
 import 'package:sagelift/features/workouts/data/local/workout_hive_store.dart';
 import 'package:sagelift/features/workouts/data/models/workout_hive_model.dart';
 import 'package:sagelift/features/workouts/data/models/workout_set_hive_model.dart';
 import 'package:sagelift/features/workouts/data/repositories/hive_exercise_repository.dart';
 import 'package:sagelift/features/workouts/data/repositories/hive_workout_repository.dart';
+import 'package:sagelift/features/workouts/data/repositories/local_workout_draft_repository.dart';
 import 'package:sagelift/features/workouts/data/services/workout_seed_service.dart';
 import 'package:sagelift/features/workouts/domain/models/conditioning.dart';
 import 'package:sagelift/features/workouts/domain/models/workout.dart';
+import 'package:sagelift/features/workouts/domain/models/workout_draft.dart';
 import 'package:sagelift/features/workouts/domain/models/workout_set.dart';
 import 'package:sagelift/features/workouts/domain/services/exercise_progression_service.dart';
+import 'package:sagelift/features/workouts/domain/services/workout_program.dart';
+import 'package:sagelift/features/workouts/presentation/providers/workout_completion_controller.dart';
 
 void main() {
   late Directory temporaryDirectory;
@@ -23,6 +28,12 @@ void main() {
     );
     Hive.init(temporaryDirectory.path);
     WorkoutHiveAdapters.registerAll();
+  });
+
+  setUp(() async {
+    final WorkoutHiveStore store = await WorkoutHiveStore.open();
+    await store.workoutBox.clear();
+    await store.exerciseBox.clear();
   });
 
   tearDownAll(() async {
@@ -149,11 +160,74 @@ void main() {
       );
       expect(
         legs.exerciseIds,
-        contains('seed-exercise-standing-cable-leg-curl'),
+        contains('seed-exercise-bodyweight-hamstring-walkout'),
       );
       expect(legs.sessionDurationTarget, contains('65–75'));
     },
   );
+
+  test(
+      'real Hive migration and reload retain draft IDs, preference and active-session completion',
+      () async {
+    final _Repositories repositories = await _openRepositories();
+    final Workout active = _completedWorkout(
+            id: 'seed-workout-pull-a-hybrid',
+            name: 'Pull A Hybrid',
+            track: WorkoutTrack.hybrid,
+            completedAt: DateTime.utc(2026, 10, 21))
+        .copyWith(status: WorkoutStatus.inProgress, completedAt: null);
+    await repositories.workoutRepository.save(active);
+    Box<dynamic> settings = await Hive.openBox<dynamic>('sagelift_settings');
+    await settings.put('app.theme_preference', 'dark');
+    final WorkoutDraft draft =
+        WorkoutDraft(workoutId: active.id, sets: <String, WorkoutSetProgress>{
+      active.sets.single.id:
+          const WorkoutSetProgress(weight: '82.5', reps: '7'),
+    });
+    await LocalWorkoutDraftRepository(_BoxKeyValueStore(settings)).save(draft);
+    final Map<dynamic, dynamic> originalSettings = settings.toMap();
+    final WorkoutSeedService seed = WorkoutSeedService(
+        exerciseRepository: repositories.exerciseRepository,
+        workoutRepository: repositories.workoutRepository);
+    await seed.seedIfEmpty();
+    await seed.seedIfEmpty();
+    expect(settings.toMap(), originalSettings);
+    await settings.close();
+    await repositories.store.workoutBox.close();
+    await repositories.store.exerciseBox.close();
+    final WorkoutHiveStore reopened = await WorkoutHiveStore.open();
+    final HiveWorkoutRepository workouts =
+        HiveWorkoutRepository(reopened.workoutBox);
+    settings = await Hive.openBox<dynamic>('sagelift_settings');
+    final LocalWorkoutDraftRepository drafts =
+        LocalWorkoutDraftRepository(_BoxKeyValueStore(settings));
+    expect(settings.toMap(), originalSettings);
+    final WorkoutDraft loaded = await drafts.load(active.id);
+    expect(loaded.workoutId, active.id);
+    expect(loaded.sets.keys, draft.sets.keys);
+    expect(loaded.sets[active.sets.single.id]?.weight, '82.5');
+    expect(loaded.sets[active.sets.single.id]?.reps, '7');
+    expect(
+        WorkoutProgram.nextIncompleteWorkout(await workouts.getAll()), active);
+    final WorkoutCompletionController controller = WorkoutCompletionController(
+        workoutRepository: workouts,
+        onWorkoutChanged: () {},
+        finalizeDraft: (String id, DateTime now) => drafts.load(id),
+        removeDraft: drafts.remove,
+        onFinishingChanged: (String id, bool finishing) {},
+        now: () => DateTime.utc(2026, 10, 22));
+    final Workout completed = (await controller.finishWorkout(active.id))!;
+    expect(completed.id, active.id);
+    expect(completed.sets.single.id, active.sets.single.id);
+    expect(completed.sets.single.weightKg, 82.5);
+    expect(completed.sets.single.reps, 7);
+    expect(settings.get('app.theme_preference'), 'dark');
+    expect(WorkoutProgram.nextIncompleteWorkout(await workouts.getAll())?.name,
+        'Chest + Triceps');
+    expect((await workouts.getAll()).where((Workout w) => w.id == active.id),
+        hasLength(1));
+    await settings.close();
+  });
 
   test(
     'migration retains legacy PPL and CrossFit completed history verbatim',
@@ -395,4 +469,17 @@ Workout _completedWorkout({
           ),
     conditioningResult: conditioningResult,
   );
+}
+
+class _BoxKeyValueStore implements KeyValueStore {
+  _BoxKeyValueStore(this.box);
+  final Box<dynamic> box;
+  @override
+  Future<void> initialize() async {}
+  @override
+  Future<T?> read<T>(String key) async => box.get(key) as T?;
+  @override
+  Future<void> write<T>(String key, T value) => box.put(key, value);
+  @override
+  Future<void> delete(String key) => box.delete(key);
 }

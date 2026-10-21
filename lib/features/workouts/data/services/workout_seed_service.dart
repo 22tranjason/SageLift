@@ -270,10 +270,10 @@ class WorkoutSeedService {
       Equipment.dumbbells,
     ),
     _exercise(
-      'seed-exercise-standing-cable-leg-curl',
-      'Standing Cable Leg Curl (Ankle Cuff)',
+      'seed-exercise-bodyweight-hamstring-walkout',
+      'Bodyweight Hamstring Walkout',
       MuscleGroup.legs,
-      Equipment.cableMachine,
+      Equipment.bodyweight,
     ),
     _exercise(
       'hybrid-kettlebell-swing',
@@ -419,10 +419,10 @@ class WorkoutSeedService {
           'Target 8–12 reps per leg; rest 120 sec; leave 2–3 reps in reserve; no mandatory failure.',
         ),
         _ExercisePrescription(
-          'seed-exercise-standing-cable-leg-curl',
-          15,
+          'seed-exercise-bodyweight-hamstring-walkout',
+          10,
           3,
-          'Target 10–15 reps per leg; rest 90 sec; leave 2–3 reps in reserve; no mandatory failure.',
+          'Target 6–10 reps; each controlled heel walk out and back is one rep. Keep hips comfortably raised; use a short range initially. Rest 90 sec; leave 2–3 reps in reserve; no mandatory failure.',
         ),
         _ExercisePrescription(
           'seed-exercise-standing-dumbbell-calf-raise',

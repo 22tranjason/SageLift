@@ -29,11 +29,15 @@ warm-up; Saturday targets 65–75 minutes. Rest periods are between working sets
 | Legs + Calves | Barbell Back Squat | 3 × 4–6 | 180 sec |
 | | Romanian Deadlift | 3 × 6–10 | 150–180 sec |
 | | Dumbbell Reverse Lunge | 2 × 8–12 per leg | 120 sec |
-| | Standing Cable Leg Curl (ankle cuff) | 3 × 10–15 per leg | 90 sec |
+| | Bodyweight Hamstring Walkout | 3 × 6–10 | 90 sec |
 | | Standing Dumbbell Calf Raise | 4 × 10–15 | 90 sec |
 
 Totals: 12, 13, 12 and 15 working sets. Unilateral sets include both sides.
-Cable curls require a low pulley and ankle cuff. No cable lateral raise or chest
+Hamstring walkouts need no accessory: keep hips comfortably raised and walk the
+heels out and back under control; one out-and-back cycle is one repetition. Use
+a short range initially. A standing cable leg curl (3 × 10–15 per leg, 90 sec
+rest) is an alternative only if a suitable ankle cuff is already available;
+standard cables alone do not establish that. No cable lateral raise or chest
 press machine is prescribed. Keep 2–3 repetitions in reserve and controlled
 technique. No maximal attempts or mandatory failure. Once every working set
 reaches the top of its range with that reserve, add the smallest available
@@ -71,10 +75,53 @@ is not a signed Android or iOS package.
 ## Cloud verification
 
 Validated with Flutter 3.41.5 / Dart 3.11.3: formatting, static analysis, the full
-99-test suite, and a release web build at `/SageLift/`. Pub resolution for this
+100-test suite, and a release web build at `/SageLift/`. Pub resolution for this
 SDK temporarily used its pinned `meta 1.17.0` and `test_api 0.7.10`; the repository
 lockfile is preserved (meta 1.18.0 and test_api 0.7.11). No dependencies were added
 or committed. Release CI should also validate with its configured stable SDK.
 No physical-phone, Android-package or signed iOS build was performed. The web
 build reports a missing optional Cupertino font family while completing
 successfully; this change does not add Cupertino icons.
+
+
+## Release review
+
+The deployment workflow uses `subosito/flutter-action@v2`, channel `stable`,
+without a fixed Flutter version. The saved cloud SDK is Flutter 3.41.5 / Dart
+3.11.3. The workflow deploys on a push to main or manual dispatch; it does not
+run branch-only checks. Do not dispatch it as a harmless CI check: successful
+completion includes a production Pages deployment.
+
+The configured URL and base path are `https://22tranjason.github.io/SageLift/`
+and `/SageLift/`. Live URL and `version.json` reads were blocked by HTTP 403
+in this environment; the browser tool could not access them either. The shell GitHub Actions query was also forbidden. The connected GitHub tool
+successfully verified the last main deployment: run 37403118380, conclusion
+success, SHA 224d206bd0f92836a34349ffa2fe4197f693c266. Its deploy log records the
+environment URL `https://22tranjason.github.io/SageLift/`, confirming site identity.
+The prior build log used Flutter stable 3.47.6. Its public Linux archive and
+release manifest returned HTTP 404 here, so local checks use the saved 3.41.5 SDK.
+Current live HTTP availability and served version remain unverified. Git branch
+pushes and remote ref reads work.
+
+After explicit PWA/release confirmation, review the branch and use the agreed
+release process. If a main merge is authorized, a normal reviewed merge triggers
+the workflow; wait for its build and deploy jobs, inspect the resulting Pages
+URL and `version.json`, and verify its SHA matches the release. A separately
+authorized manual dispatch can also deploy a selected ref, but is a production
+action. Do not run it before publish permission. Then back up on the phone,
+update the same installed PWA online, and verify history and an existing active
+draft before starting the desired session manually. A Thursday session remains
+an explicit choice; the suggested rest schedule is unchanged.
+
+
+A final Hive regression test now seeds twice, closes and reopens storage, and
+checks the exact saved settings JSON, theme preference, workout and set IDs,
+draft values, resumability, and completion into the new rotation. Existing Hive
+repository tests now clear their test boxes between cases to avoid state leaking
+from one migration scenario into another. This test-only cleanup is not present
+in application code.
+
+Publication was subsequently authorized for the existing iPhone Home Screen PWA.
+The release remains pending live-site access verification: HTTP reads of the site
+and version.json return 403, including outside the filesystem sandbox. No main
+merge or workflow dispatch has been performed while this prerequisite is blocked.
