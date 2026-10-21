@@ -39,6 +39,7 @@ Future<void> main() async {
   await WorkoutSeedService(
     exerciseRepository: exerciseRepository,
     workoutRepository: workoutRepository,
+    settingsStore: localStore,
   ).seedIfEmpty();
   runApp(
     ProviderScope(

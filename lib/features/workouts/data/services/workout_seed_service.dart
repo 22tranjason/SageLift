@@ -1,8 +1,10 @@
+import '../../../../core/storage/key_value_store.dart';
 import '../../domain/models/exercise.dart';
 import '../../domain/models/workout.dart';
 import '../../domain/models/workout_set.dart';
 import '../../domain/repositories/exercise_repository.dart';
 import '../../domain/repositories/workout_repository.dart';
+import '../../domain/services/back_biceps_program_v2.dart';
 import '../../domain/services/workout_program.dart';
 
 /// Adds future Hybrid templates without changing any historical records.
@@ -11,11 +13,14 @@ class WorkoutSeedService {
   const WorkoutSeedService({
     required ExerciseRepository exerciseRepository,
     required WorkoutRepository workoutRepository,
+    KeyValueStore? settingsStore,
   })  : _exerciseRepository = exerciseRepository,
-        _workoutRepository = workoutRepository;
+        _workoutRepository = workoutRepository,
+        _settingsStore = settingsStore;
 
   final ExerciseRepository _exerciseRepository;
   final WorkoutRepository _workoutRepository;
+  final KeyValueStore? _settingsStore;
 
   /// Inserts missing Hybrid catalogue entries and templates idempotently.
   ///
@@ -24,8 +29,15 @@ class WorkoutSeedService {
   Future<void> seedIfEmpty() async {
     await _seedMissingHybridData();
     for (final Workout workout in await _workoutRepository.getAll()) {
+      // Any persisted draft, including an unknown version, protects the session.
+      final bool hasDraft = await _settingsStore?.read<Object>(
+            'workouts.draft.v1.${workout.id}',
+          ) !=
+          null;
+      final Workout migrated =
+          hasDraft ? workout : BackBicepsProgramV2.migrateUnstarted(workout);
       final Workout cleaned = WorkoutProgram.withoutUnfinishedConditioning(
-        workout,
+        migrated,
       );
       if (!identical(cleaned, workout)) await _workoutRepository.save(cleaned);
     }
@@ -234,6 +246,12 @@ class WorkoutSeedService {
       Equipment.dumbbells,
     ),
     _exercise(
+      'seed-exercise-ez-bar-curl',
+      'EZ-Bar Curl',
+      MuscleGroup.arms,
+      Equipment.barbell,
+    ),
+    _exercise(
       'seed-exercise-barbell-front-squat',
       'Barbell Front Squat',
       MuscleGroup.legs,
@@ -345,11 +363,11 @@ class WorkoutSeedService {
         _ExercisePrescription(
           'seed-exercise-chest-supported-dumbbell-row',
           12,
-          2,
+          3,
           'Target 8–12 reps; rest 120 sec; leave 2–3 reps in reserve; no mandatory failure.',
         ),
         _ExercisePrescription(
-          'seed-exercise-alternating-dumbbell-curl',
+          'seed-exercise-ez-bar-curl',
           12,
           3,
           'Target 8–12 reps; rest 75 sec; leave 2–3 reps in reserve; no mandatory failure.',
@@ -357,7 +375,7 @@ class WorkoutSeedService {
         _ExercisePrescription(
           'seed-exercise-dumbbell-hammer-curl',
           15,
-          2,
+          3,
           'Target 10–15 reps; rest 75 sec; leave 2–3 reps in reserve; no mandatory failure.',
         ),
       ],
