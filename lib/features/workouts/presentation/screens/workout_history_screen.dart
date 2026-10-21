@@ -51,7 +51,8 @@ class WorkoutHistoryScreen extends ConsumerWidget {
                         Text(_trackLabel(item.workout.track)),
                         Text(_dateLabel(item.workout.completedAt)),
                         Text(
-                            'Duration: ${_durationLabel(item.summary.duration)}'),
+                          'Duration: ${_durationLabel(item.summary.duration)}',
+                        ),
                         Text(
                           'Sets: ${item.summary.setsCompleted} • '
                           'Reps: ${item.summary.totalReps}',
@@ -113,6 +114,6 @@ String _trackLabel(WorkoutTrack track) {
     case WorkoutTrack.crossFit:
       return 'CrossFit';
     case WorkoutTrack.hybrid:
-      return 'Hybrid PPL';
+      return 'Strength';
   }
 }

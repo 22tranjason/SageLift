@@ -44,7 +44,10 @@ final ConditioningPlan draftTestPlan = ConditioningPlan(
   prescribedRounds: 3,
   movements: const <ConditioningMovement>[
     ConditioningMovement(
-        id: 'snatch', name: 'Dumbbell snatch', prescribedReps: 10),
+      id: 'snatch',
+      name: 'Dumbbell snatch',
+      prescribedReps: 10,
+    ),
     ConditioningMovement(id: 'squat', name: 'Goblet squat', prescribedReps: 12),
   ],
 );
@@ -52,7 +55,7 @@ final ConditioningPlan draftTestPlan = ConditioningPlan(
 /// Minimal session containing both strength and conditioning.
 Workout draftTestWorkout({
   String id = 'push',
-  String name = 'Push A Hybrid',
+  String name = 'Chest + Triceps',
   WorkoutStatus status = WorkoutStatus.inProgress,
   WorkoutTrack track = WorkoutTrack.crossFit,
 }) =>

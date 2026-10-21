@@ -7,6 +7,14 @@ class WorkoutProgram {
 
   /// The sole sequence available for new and future SageLift sessions.
   static const List<String> workoutNames = <String>[
+    'Chest + Triceps',
+    'Back + Biceps',
+    'Shoulders + Traps',
+    'Legs + Calves',
+  ];
+
+  /// Retired six-session names remain identifiable in history.
+  static const List<String> retiredHybridWorkoutNames = <String>[
     'Push A Hybrid',
     'Pull A Hybrid',
     'Legs A Hybrid',
@@ -14,6 +22,11 @@ class WorkoutProgram {
     'Pull B Hybrid',
     'Legs B Hybrid',
   ];
+
+  /// Suggested calendar only; missed days never advance the completion rotation.
+  static const String weeklySchedule =
+      'Tue: Chest + Triceps • Wed: Back + Biceps • Thu: Rest • '
+      'Fri: Shoulders + Traps • Sat: Legs + Calves • Sun + Mon: Rest';
 
   /// Legacy PPL names retained only to identify historical records safely.
   static const List<String> legacyStrengthWorkoutNames = <String>[
@@ -54,6 +67,7 @@ class WorkoutProgram {
   /// Whether [workoutName] is known to any present or historical programme.
   static bool isProgramWorkoutName(String workoutName) =>
       workoutNames.contains(workoutName) ||
+      retiredHybridWorkoutNames.contains(workoutName) ||
       legacyStrengthWorkoutNames.contains(workoutName) ||
       crossFitWorkoutNames.contains(workoutName);
 
@@ -66,7 +80,8 @@ class WorkoutProgram {
 
   /// Returns the track inferred from a known workout name.
   static WorkoutTrack? trackForWorkoutName(String workoutName) {
-    if (workoutNames.contains(workoutName)) {
+    if (workoutNames.contains(workoutName) ||
+        retiredHybridWorkoutNames.contains(workoutName)) {
       return WorkoutTrack.hybrid;
     }
     if (legacyStrengthWorkoutNames.contains(workoutName)) {
@@ -99,8 +114,10 @@ class WorkoutProgram {
     WorkoutTrack track = WorkoutTrack.hybrid,
   }) {
     final List<Workout> values = workouts
-        .where((Workout workout) =>
-            isValidCompletedProgramWorkout(workout, track: track))
+        .where(
+          (Workout workout) =>
+              isValidCompletedProgramWorkout(workout, track: track),
+        )
         .toList(growable: false)
       ..sort(_compareCompletionDescending);
     return values.isEmpty ? null : values.first;
@@ -135,21 +152,27 @@ class WorkoutProgram {
     WorkoutTrack track = WorkoutTrack.hybrid,
   }) {
     final List<Workout> active = workouts
-        .where((Workout workout) =>
-            workout.track == track &&
-            workout.status == WorkoutStatus.inProgress)
+        .where(
+          (Workout workout) =>
+              workout.track == track &&
+              workout.status == WorkoutStatus.inProgress,
+        )
         .toList(growable: false)
       ..sort(_compareActiveDescending);
     if (active.isNotEmpty) {
       return active.first;
     }
-    final String recommended =
-        recommendedNextWorkoutName(workouts, track: track);
+    final String recommended = recommendedNextWorkoutName(
+      workouts,
+      track: track,
+    );
     final List<Workout> planned = workouts
-        .where((Workout workout) =>
-            workout.track == track &&
-            workout.status == WorkoutStatus.planned &&
-            workout.name == recommended)
+        .where(
+          (Workout workout) =>
+              workout.track == track &&
+              workout.status == WorkoutStatus.planned &&
+              workout.name == recommended,
+        )
         .toList(growable: false)
       ..sort(_comparePlannedDeterministically);
     return planned.isEmpty ? null : planned.first;
@@ -174,24 +197,26 @@ class WorkoutProgram {
     required String id,
     required DateTime scheduledDate,
   }) =>
-      withoutUnfinishedConditioning(template.copyWith(
-        id: id,
-        scheduledDate: scheduledDate,
-        sets: <WorkoutSet>[
-          for (int index = 0; index < template.sets.length; index++)
-            template.sets[index].copyWith(
-              id: '$id-set-${index + 1}',
-              weightKg: null,
-              reps: null,
-              rpe: null,
-              status: WorkoutSetStatus.planned,
-            ),
-        ],
-        status: WorkoutStatus.planned,
-        startedAt: null,
-        completedAt: null,
-        conditioningResult: null,
-      ));
+      withoutUnfinishedConditioning(
+        template.copyWith(
+          id: id,
+          scheduledDate: scheduledDate,
+          sets: <WorkoutSet>[
+            for (int index = 0; index < template.sets.length; index++)
+              template.sets[index].copyWith(
+                id: '$id-set-${index + 1}',
+                weightKg: null,
+                reps: null,
+                rpe: null,
+                status: WorkoutSetStatus.planned,
+              ),
+          ],
+          status: WorkoutStatus.planned,
+          startedAt: null,
+          completedAt: null,
+          conditioningResult: null,
+        ),
+      );
 
   static int _compareCompletionDescending(Workout first, Workout second) {
     final int result = second.completedAt!.compareTo(first.completedAt!);

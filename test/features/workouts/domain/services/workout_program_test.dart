@@ -3,115 +3,143 @@ import 'package:sagelift/features/workouts/domain/models/workout.dart';
 import 'package:sagelift/features/workouts/domain/services/workout_program.dart';
 
 void main() {
-  test('no Hybrid history recommends Push A Hybrid', () {
+  test('retired six-day history cannot advance the new rotation', () {
+    for (final String name in WorkoutProgram.retiredHybridWorkoutNames) {
+      expect(WorkoutProgram.isProgramWorkoutName(name), isTrue);
+      expect(WorkoutProgram.isSelectableWorkoutName(name), isFalse);
+      expect(
+        WorkoutProgram.recommendedNextWorkoutName(<Workout>[
+          _completed(name, DateTime.utc(2026, 10, 21)),
+        ]),
+        'Chest + Triceps',
+      );
+      final Workout active = _inProgress(name, DateTime.utc(2026, 10, 21));
+      expect(WorkoutProgram.nextIncompleteWorkout(<Workout>[active]), active);
+    }
+  });
+
+  test(
+    'suggested rest days do not prevent manual selection or move rotation',
+    () {
+      expect(WorkoutProgram.weeklySchedule, contains('Thu: Rest'));
+      expect(WorkoutProgram.weeklySchedule, contains('Sun + Mon: Rest'));
+      expect(WorkoutProgram.workoutNames, hasLength(4));
+      expect(
+        WorkoutProgram.nextWorkoutName('Legs + Calves'),
+        'Chest + Triceps',
+      );
+    },
+  );
+
+  test('no Hybrid history recommends Chest + Triceps', () {
     expect(
       WorkoutProgram.recommendedNextWorkoutName(const <Workout>[]),
-      'Push A Hybrid',
+      'Chest + Triceps',
     );
   });
 
-  test('legacy PPL and CrossFit completions do not set the Hybrid position',
-      () {
-    final List<Workout> history = <Workout>[
-      _completed(
-        'Legs B',
-        DateTime.utc(2026, 8, 1),
-        track: WorkoutTrack.strengthPpl,
-      ),
-      _completed(
-        'CrossFit F',
-        DateTime.utc(2026, 8, 2),
-        track: WorkoutTrack.crossFit,
-      ),
-    ];
+  test(
+    'legacy PPL and CrossFit completions do not set the Hybrid position',
+    () {
+      final List<Workout> history = <Workout>[
+        _completed(
+          'Legs B',
+          DateTime.utc(2026, 8, 1),
+          track: WorkoutTrack.strengthPpl,
+        ),
+        _completed(
+          'CrossFit F',
+          DateTime.utc(2026, 8, 2),
+          track: WorkoutTrack.crossFit,
+        ),
+      ];
 
+      expect(
+        WorkoutProgram.recommendedNextWorkoutName(history),
+        'Chest + Triceps',
+      );
+    },
+  );
+
+  test('Chest + Triceps completion recommends Back + Biceps', () {
     expect(
-      WorkoutProgram.recommendedNextWorkoutName(history),
-      'Push A Hybrid',
+      WorkoutProgram.recommendedNextWorkoutName(<Workout>[
+        _completed('Chest + Triceps', DateTime.utc(2026, 8, 1, 7)),
+      ]),
+      'Back + Biceps',
     );
   });
 
-  test('Push A Hybrid completion recommends Pull A Hybrid', () {
+  test('Back + Biceps completion recommends Shoulders + Traps', () {
     expect(
-      WorkoutProgram.recommendedNextWorkoutName(
-        <Workout>[_completed('Push A Hybrid', DateTime.utc(2026, 8, 1, 7))],
-      ),
-      'Pull A Hybrid',
+      WorkoutProgram.recommendedNextWorkoutName(<Workout>[
+        _completed('Back + Biceps', DateTime.utc(2026, 8, 1, 7)),
+      ]),
+      'Shoulders + Traps',
     );
   });
 
-  test('Pull A Hybrid completion recommends Legs A Hybrid', () {
-    expect(
-      WorkoutProgram.recommendedNextWorkoutName(
-        <Workout>[_completed('Pull A Hybrid', DateTime.utc(2026, 8, 1, 7))],
-      ),
-      'Legs A Hybrid',
-    );
-  });
-
-  test('loops through the complete Hybrid A/B programme', () {
+  test('loops through the complete four-day programme', () {
     const List<String> expectedNextNames = <String>[
-      'Pull A Hybrid',
-      'Legs A Hybrid',
-      'Push B Hybrid',
-      'Pull B Hybrid',
-      'Legs B Hybrid',
-      'Push A Hybrid',
+      'Back + Biceps',
+      'Shoulders + Traps',
+      'Legs + Calves',
+      'Chest + Triceps',
     ];
 
     for (int index = 0; index < WorkoutProgram.workoutNames.length; index++) {
       expect(
-        WorkoutProgram.recommendedNextWorkoutName(
-          <Workout>[
-            _completed(
-              WorkoutProgram.workoutNames[index],
-              DateTime.utc(2026, 8, index + 1),
-            ),
-          ],
-        ),
+        WorkoutProgram.recommendedNextWorkoutName(<Workout>[
+          _completed(
+            WorkoutProgram.workoutNames[index],
+            DateTime.utc(2026, 8, index + 1),
+          ),
+        ]),
         expectedNextNames[index],
       );
     }
   });
 
-  test('uses the latest Hybrid completion timestamp rather than list order',
-      () {
-    final List<Workout> workouts = <Workout>[
-      _completed('Legs B Hybrid', DateTime.utc(2026, 8, 1, 7)),
-      _completed('Pull A Hybrid', DateTime.utc(2026, 8, 3, 7)),
-      _completed('Push A Hybrid', DateTime.utc(2026, 8, 2, 7)),
-    ];
+  test(
+    'uses the latest Hybrid completion timestamp rather than list order',
+    () {
+      final List<Workout> workouts = <Workout>[
+        _completed('Legs + Calves', DateTime.utc(2026, 8, 1, 7)),
+        _completed('Back + Biceps', DateTime.utc(2026, 8, 3, 7)),
+        _completed('Chest + Triceps', DateTime.utc(2026, 8, 2, 7)),
+      ];
 
-    expect(
-      WorkoutProgram.recommendedNextWorkoutName(workouts),
-      'Legs A Hybrid',
-    );
-  });
+      expect(
+        WorkoutProgram.recommendedNextWorkoutName(workouts),
+        'Shoulders + Traps',
+      );
+    },
+  );
 
   test('planned legacy records never determine the Hybrid position', () {
     final List<Workout> workouts = <Workout>[
-      _completed('Pull A Hybrid', DateTime.utc(2026, 8, 3, 7)),
+      _completed('Back + Biceps', DateTime.utc(2026, 8, 3, 7)),
       _planned('Push A', track: WorkoutTrack.strengthPpl),
       _planned('Legs A', track: WorkoutTrack.strengthPpl),
-      _planned('Legs A Hybrid'),
+      _planned('Shoulders + Traps'),
     ];
 
     expect(
       WorkoutProgram.nextIncompleteWorkout(workouts)?.name,
-      'Legs A Hybrid',
+      'Shoulders + Traps',
     );
   });
 
   test('prefers the active Hybrid workout so a manual choice can resume', () {
     final List<Workout> workouts = <Workout>[
-      _completed('Push A Hybrid', DateTime.utc(2026, 8, 1, 7)),
-      _planned('Pull A Hybrid'),
-      _inProgress('Pull B Hybrid', DateTime.utc(2026, 8, 2, 6)),
+      _completed('Chest + Triceps', DateTime.utc(2026, 8, 1, 7)),
+      _planned('Back + Biceps'),
+      _inProgress('Shoulders + Traps', DateTime.utc(2026, 8, 2, 6)),
     ];
 
     expect(
       WorkoutProgram.nextIncompleteWorkout(workouts)?.name,
-      'Pull B Hybrid',
+      'Shoulders + Traps',
     );
   });
 
