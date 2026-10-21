@@ -59,8 +59,8 @@ unchanged. The persisted track enum remains unchanged for Hive compatibility.
 
 Source changes in a cloud checkout or Git branch do not update an installed app.
 The repository's Pages workflow deploys from main on push, or via manual dispatch.
-This change must first be reviewed and released through the repository's chosen
-process. This task does not merge main or deploy production.
+Production release uses the reviewed PR and the existing main-triggered workflow.
+A Git branch alone does not publish the app.
 
 For the existing GitHub Pages/PWA installation, after a successful deployment at
 https://22tranjason.github.io/SageLift/, open that same site/browser profile on
@@ -122,6 +122,8 @@ from one migration scenario into another. This test-only cleanup is not present
 in application code.
 
 Publication was subsequently authorized for the existing iPhone Home Screen PWA.
-The release remains pending live-site access verification: HTTP reads of the site
-and version.json return 403, including outside the filesystem sandbox. No main
-merge or workflow dispatch has been performed while this prerequisite is blocked.
+Shell HTTP reads of the site and version.json return 403, including outside the
+filesystem sandbox. The parent subsequently verified the existing site in the
+permitted cloud browser: it loads the expected SageLift dashboard without a login
+or 403. This resolves the live-access prerequisite. Release can proceed through
+the existing workflow; the parent browser will verify the updated served UI.
