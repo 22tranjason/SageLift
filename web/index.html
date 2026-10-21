@@ -33,14 +33,41 @@
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
-  <!--
-    You can customize the "flutter_bootstrap.js" script.
-    This is useful to provide a custom configuration to the Flutter loader
-    or to give the user feedback during the initialization process.
-
-    For more details:
-    * https://docs.flutter.dev/platform-integration/web/initialization
-  -->
-  <script src="flutter_bootstrap.js" async></script>
+  <script>
+    // Version the executable assets as well as the document. A query on this
+    // page alone does not invalidate a cached bootstrap or main.dart.js.
+    (async () => {
+      let buildId = new URL(location.href).searchParams.get('sagelift-build');
+      try {
+        const versionUrl = new URL('version.json', document.baseURI);
+        versionUrl.searchParams.set('cacheBust', Date.now());
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 4000);
+        let response;
+        try {
+          response = await fetch(versionUrl, { cache: 'no-store', signal: controller.signal });
+        } finally {
+          clearTimeout(timeout);
+        }
+        if (!response.ok) throw new Error('Version unavailable');
+        const version = await response.json();
+        if (typeof version.buildId === 'string' && version.buildId.length > 0 && version.buildId !== 'development') {
+          buildId = version.buildId;
+        }
+      } catch (_) {
+        // Keep the installed app usable when offline. This key contains only
+        // the last successfully loaded release ID, never workout data.
+        try {
+          buildId ||= localStorage.getItem('sagelift.loaded-build.v1');
+        } catch (_) {}
+      }
+      const bootstrap = new URL('flutter_bootstrap.js', document.baseURI);
+      if (buildId) bootstrap.searchParams.set('sagelift-build', buildId);
+      const script = document.createElement('script');
+      script.src = bootstrap.href;
+      script.async = true;
+      document.body.appendChild(script);
+    })();
+  </script>
 </body>
 </html>
