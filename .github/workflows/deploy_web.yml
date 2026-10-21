@@ -34,6 +34,9 @@ jobs:
       - name: Analyze
         run: flutter analyze
 
+      - name: Test web release bootstrap
+        run: node --test test/web/deployment_bootstrap_test.cjs
+
       - name: Test
         run: flutter test
 
