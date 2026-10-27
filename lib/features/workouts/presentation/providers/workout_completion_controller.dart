@@ -26,6 +26,7 @@ final Provider<WorkoutCompletionController>
     onFinishingChanged: (String id, bool finishing) {
       ref.read(workoutDraftFinishingProvider(id).notifier).state = finishing;
     },
+    isBusy: (String id) => ref.read(workoutDraftFinishingProvider(id)),
     now: ref.watch(workoutClockProvider),
   );
 });
@@ -62,13 +63,15 @@ class WorkoutCompletionController {
     required Future<WorkoutDraft> Function(String, DateTime) finalizeDraft,
     required Future<void> Function(String) removeDraft,
     required void Function(String, bool) onFinishingChanged,
+    bool Function(String)? isBusy,
     DateTime Function()? now,
   })  : _workoutRepository = workoutRepository,
         _onWorkoutChanged = onWorkoutChanged,
         _finalizeDraft = finalizeDraft,
         _removeDraft = removeDraft,
         _onFinishingChanged = onFinishingChanged,
-        _now = now ?? DateTime.now;
+        _now = now ?? DateTime.now,
+        _isBusy = isBusy ?? ((String _) => false);
 
   final WorkoutRepository _workoutRepository;
   final void Function() _onWorkoutChanged;
@@ -76,12 +79,14 @@ class WorkoutCompletionController {
   final Future<void> Function(String) _removeDraft;
   final void Function(String, bool) _onFinishingChanged;
   final DateTime Function() _now;
+  final bool Function(String) _isBusy;
   final Set<String> _finishingWorkoutIds = <String>{};
 
   /// Starts [workout] once and persists its start time.
   ///
   /// A completed workout is returned as null so it cannot be completed again.
   Future<Workout?> startWorkout(Workout workout) async {
+    if (_isBusy(workout.id)) throw StateError('Workout is busy.');
     final Workout? storedWorkout = await _workoutRepository.getById(workout.id);
     final Workout currentWorkout =
         WorkoutProgram.withoutUnfinishedConditioning(storedWorkout ?? workout);
@@ -113,7 +118,7 @@ class WorkoutCompletionController {
   /// Returns null when missing or another Finish is running. A saved completion
   /// can be retried to recover failed draft cleanup without rewriting history.
   Future<Workout?> finishWorkout(String workoutId) async {
-    if (!_finishingWorkoutIds.add(workoutId)) return null;
+    if (_isBusy(workoutId) || !_finishingWorkoutIds.add(workoutId)) return null;
     _onFinishingChanged(workoutId, true);
     try {
       final Workout? workout = await _workoutRepository.getById(workoutId);
@@ -190,6 +195,9 @@ class WorkoutCompletionController {
       });
     final Workout? activeWorkout =
         activeWorkouts.isEmpty ? null : activeWorkouts.first;
+    if (activeWorkout != null && _isBusy(activeWorkout.id)) {
+      throw StateError('Workout is busy.');
+    }
     if (activeWorkout != null && activeWorkout.name != workoutName) {
       if (!replaceInProgress) {
         throw WorkoutAlreadyInProgressException(activeWorkout);

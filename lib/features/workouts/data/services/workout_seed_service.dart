@@ -110,6 +110,14 @@ class WorkoutSeedService {
     );
   }
 
+  /// Returns the current default prescription for an explicit empty-session reset.
+  static Workout? defaultTemplateFor(String name) {
+    for (final Workout template in _hybridWorkouts) {
+      if (template.name == name) return template;
+    }
+    return null;
+  }
+
   static final List<Exercise> _hybridExercises = <Exercise>[
     _exercise(
       'seed-exercise-barbell-bench-press',

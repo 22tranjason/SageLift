@@ -7,8 +7,10 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/router/app_router.dart';
 import '../../domain/models/workout.dart';
 import '../../domain/services/workout_program.dart';
+import '../providers/empty_workout_cancellation_provider.dart';
 import '../providers/today_workout_provider.dart';
 import '../providers/workout_completion_controller.dart';
+import '../providers/workout_draft_controller.dart';
 import '../widgets/workout_exercise_list.dart';
 
 /// The first-use daily dashboard for workouts.
@@ -144,6 +146,17 @@ class TodayScreen extends ConsumerWidget {
                           ),
                         ),
                       ),
+                      if (workoutData.workout.status ==
+                          WorkoutStatus.inProgress)
+                        TextButton(
+                          key: const ValueKey<String>('cancel-workout-button'),
+                          onPressed: ref.watch(workoutDraftFinishingProvider(
+                                  workoutData.workout.id))
+                              ? null
+                              : () => _cancelWorkout(
+                                  context, ref, workoutData.workout),
+                          child: const Text('Cancel Workout'),
+                        ),
                       const SizedBox(height: 8),
                       Text(
                         workoutData.isRecommended
@@ -203,6 +216,39 @@ class TodayScreen extends ConsumerWidget {
       'December',
     ];
     return '${weekdays[date.weekday - 1]}, ${date.day} ${months[date.month - 1]}';
+  }
+
+  Future<void> _cancelWorkout(
+      BuildContext context, WidgetRef ref, Workout workout) async {
+    final bool confirmed = await showDialog<bool>(
+          context: context,
+          builder: (BuildContext dialogContext) => AlertDialog(
+            title: const Text('Cancel empty workout?'),
+            content: const Text(
+                'Only this active session will be reset if it has no entered values. Your past history stays saved. The latest plan will be ready when you tap Start Workout.'),
+            actions: <Widget>[
+              TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text('Keep workout')),
+              FilledButton(
+                  onPressed: () => Navigator.pop(dialogContext, true),
+                  child: const Text('Cancel empty workout')),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed || !context.mounted) return;
+    try {
+      await ref.read(emptyWorkoutCancellationProvider).cancel(workout.id);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Empty workout cancelled. The latest plan is ready.')));
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+              'Unable to cancel safely. Entries, a custom plan, or a saving problem may need attention. Your history has not been deleted.')));
+    }
   }
 
   Future<void> _chooseWorkout(BuildContext context, WidgetRef ref) async {
