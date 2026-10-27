@@ -5,6 +5,7 @@ import '../../domain/models/workout_set.dart';
 import '../../domain/repositories/exercise_repository.dart';
 import '../../domain/repositories/workout_repository.dart';
 import '../../domain/services/back_biceps_program_v2.dart';
+import '../../domain/services/equipment_program_update.dart';
 import '../../domain/services/workout_program.dart';
 
 /// Adds future Hybrid templates without changing any historical records.
@@ -34,8 +35,11 @@ class WorkoutSeedService {
             'workouts.draft.v1.${workout.id}',
           ) !=
           null;
-      final Workout migrated =
-          hasDraft ? workout : BackBicepsProgramV2.migrateUnstarted(workout);
+      final Workout migrated = hasDraft
+          ? workout
+          : EquipmentProgramUpdate.migrateUnstarted(
+              BackBicepsProgramV2.migrateUnstarted(workout),
+            );
       final Workout cleaned = WorkoutProgram.withoutUnfinishedConditioning(
         migrated,
       );
@@ -282,6 +286,18 @@ class WorkoutSeedService {
       Equipment.cableMachine,
     ),
     _exercise(
+      'seed-exercise-dumbbell-fly',
+      'Dumbbell Fly (Flat Bench)',
+      MuscleGroup.chest,
+      Equipment.dumbbells,
+    ),
+    _exercise(
+      'seed-exercise-cable-triceps-pushdown',
+      'Cable Triceps Pushdown',
+      MuscleGroup.arms,
+      Equipment.cableMachine,
+    ),
+    _exercise(
       'seed-exercise-dumbbell-shrug',
       'Dumbbell Shrug',
       MuscleGroup.shoulders,
@@ -329,13 +345,19 @@ class WorkoutSeedService {
           'Target 8–10 reps; rest 120 sec; leave 2–3 reps in reserve; no mandatory failure.',
         ),
         _ExercisePrescription(
-          'seed-exercise-cable-chest-fly',
+          'seed-exercise-dumbbell-fly',
           15,
           3,
           'Target 10–15 reps; rest 75 sec; leave 2–3 reps in reserve; no mandatory failure.',
         ),
         _ExercisePrescription(
           'seed-exercise-overhead-dumbbell-triceps-extension',
+          15,
+          3,
+          'Target 10–15 reps; rest 75 sec; leave 2–3 reps in reserve; no mandatory failure.',
+        ),
+        _ExercisePrescription(
+          'seed-exercise-cable-triceps-pushdown',
           15,
           3,
           'Target 10–15 reps; rest 75 sec; leave 2–3 reps in reserve; no mandatory failure.',
@@ -435,12 +457,6 @@ class WorkoutSeedService {
           12,
           2,
           'Target 8–12 reps per leg; rest 120 sec; leave 2–3 reps in reserve; no mandatory failure.',
-        ),
-        _ExercisePrescription(
-          'seed-exercise-bodyweight-hamstring-walkout',
-          10,
-          3,
-          'Target 6–10 reps; each controlled heel walk out and back is one rep. Keep hips comfortably raised; use a short range initially. Rest 90 sec; leave 2–3 reps in reserve; no mandatory failure.',
         ),
         _ExercisePrescription(
           'seed-exercise-standing-dumbbell-calf-raise',

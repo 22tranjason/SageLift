@@ -1,6 +1,7 @@
 import '../models/workout.dart';
 import '../models/workout_set.dart';
 import 'back_biceps_program_v2.dart';
+import 'equipment_program_update.dart';
 
 /// Selects the repeating programme sequence for each SageLift workout track.
 class WorkoutProgram {
@@ -198,25 +199,27 @@ class WorkoutProgram {
     required String id,
     required DateTime scheduledDate,
   }) =>
-      BackBicepsProgramV2.migrateUnstarted(
-        withoutUnfinishedConditioning(
-          template.copyWith(
-            id: id,
-            scheduledDate: scheduledDate,
-            sets: <WorkoutSet>[
-              for (int index = 0; index < template.sets.length; index++)
-                template.sets[index].copyWith(
-                  id: '$id-set-${index + 1}',
-                  weightKg: null,
-                  reps: null,
-                  rpe: null,
-                  status: WorkoutSetStatus.planned,
-                ),
-            ],
-            status: WorkoutStatus.planned,
-            startedAt: null,
-            completedAt: null,
-            conditioningResult: null,
+      EquipmentProgramUpdate.migrateUnstarted(
+        BackBicepsProgramV2.migrateUnstarted(
+          withoutUnfinishedConditioning(
+            template.copyWith(
+              id: id,
+              scheduledDate: scheduledDate,
+              sets: <WorkoutSet>[
+                for (int index = 0; index < template.sets.length; index++)
+                  template.sets[index].copyWith(
+                    id: '$id-set-${index + 1}',
+                    weightKg: null,
+                    reps: null,
+                    rpe: null,
+                    status: WorkoutSetStatus.planned,
+                  ),
+              ],
+              status: WorkoutStatus.planned,
+              startedAt: null,
+              completedAt: null,
+              conditioningResult: null,
+            ),
           ),
         ),
       );
