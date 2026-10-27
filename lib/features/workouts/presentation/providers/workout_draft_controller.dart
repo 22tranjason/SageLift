@@ -6,6 +6,7 @@ import '../../../../core/storage/key_value_store.dart';
 import '../../data/repositories/local_workout_draft_repository.dart';
 import '../../domain/models/workout.dart';
 import '../../domain/models/workout_draft.dart';
+import '../../domain/models/workout_set.dart';
 import 'today_workout_provider.dart';
 
 /// Shares one serialized write queue across all workout sessions.
@@ -72,6 +73,26 @@ class WorkoutDraftController extends FamilyAsyncNotifier<WorkoutDraft, String> {
       ...current.sets,
       setId: (current.sets[setId] ?? const WorkoutSetProgress())
           .copyWith(reps: reps),
+    }));
+  }
+
+  /// Explicitly fills blank fields from a performed set; existing input wins.
+  void useLastSet(String setId, WorkoutSet previous) {
+    if (previous.status != WorkoutSetStatus.completed) return;
+    final WorkoutDraft current = state.requireValue;
+    final WorkoutSetProgress entry =
+        current.sets[setId] ?? const WorkoutSetProgress();
+    final String weight =
+        entry.weight.trim().isEmpty && previous.weightKg != null
+            ? previous.weightKg.toString().replaceFirst(RegExp(r'\.0$'), '')
+            : entry.weight;
+    final String reps = entry.reps.trim().isEmpty && previous.reps != null
+        ? previous.reps.toString()
+        : entry.reps;
+    if (weight == entry.weight && reps == entry.reps) return;
+    _update(current.copyWith(sets: <String, WorkoutSetProgress>{
+      ...current.sets,
+      setId: entry.copyWith(weight: weight, reps: reps),
     }));
   }
 

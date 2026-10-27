@@ -79,6 +79,49 @@ void main() {
       tester.widget<TextField>(field(label)).controller!.text;
 
   testWidgets(
+      'Use last set appears only with actual history and updates visible editable fields',
+      (WidgetTester tester) async {
+    final Workout base = draftTestWorkout(track: WorkoutTrack.hybrid);
+    final Workout prior = base.copyWith(
+        id: 'prior',
+        status: WorkoutStatus.completed,
+        completedAt: DateTime.utc(2026, 9, 20),
+        sets: <WorkoutSet>[
+          base.sets.single.copyWith(
+              status: WorkoutSetStatus.completed, weightKg: 22.5, reps: 12),
+        ]);
+    await open(tester, sessions: <Workout>[base, prior]);
+    expect(find.text('Use last set'), findsOneWidget);
+    expect(textOf(tester, 'Weight (kg)'), '');
+    expect(workouts.values['push'], base);
+    await tester.enterText(field('Weight (kg)'), '30');
+    await tester.pumpAndSettle();
+    await tap(tester, 'Use last set');
+    expect(textOf(tester, 'Weight (kg)'), '30');
+    expect(textOf(tester, 'Reps'), '12');
+    expect(find.text('Use last set'), findsNothing);
+    await tester.enterText(field('Reps'), '11');
+    await tester.pumpAndSettle();
+    expect(textOf(tester, 'Reps'), '11');
+    await container.read(workoutDraftRepositoryProvider).flush();
+    expect(
+        (await container.read(workoutDraftRepositoryProvider).load('push'))
+            .sets['set-1']
+            ?.reps,
+        '11');
+    expect(workouts.values['push'], base);
+    expect(workouts.values['prior'], prior);
+  });
+
+  testWidgets('Use last set is absent without history',
+      (WidgetTester tester) async {
+    await open(tester, hybrid: true);
+    expect(find.text('Use last set'), findsNothing);
+    expect(textOf(tester, 'Weight (kg)'), '');
+    expect(textOf(tester, 'Reps'), '');
+  });
+
+  testWidgets(
       'small mobile shows matching fractional previous sets and one guidance message',
       (WidgetTester tester) async {
     tester.view.physicalSize = const Size(320, 640);

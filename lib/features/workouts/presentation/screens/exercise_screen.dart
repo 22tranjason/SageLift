@@ -227,6 +227,12 @@ class _ExerciseContent extends ConsumerWidget {
               previousSet:
                   _previousSet(previousPerformance.valueOrNull, set.setNumber),
               suggestion: _setSuggestion(guidance.valueOrNull, set.setNumber),
+              allowUseLastSet: !workoutIsCompleted,
+              onUseLastSet: () {
+                final WorkoutSet? previous = _previousSet(
+                    previousPerformance.valueOrNull, set.setNumber);
+                if (previous != null) controller.useLastSet(set.id, previous);
+              },
               onWeightChanged: (String weight) {
                 controller.updateWeight(set.id, weight);
               },
@@ -732,7 +738,7 @@ SetProgressionSuggestion? _setSuggestion(
   return null;
 }
 
-class _SetEntryCard extends StatelessWidget {
+class _SetEntryCard extends StatefulWidget {
   const _SetEntryCard({
     required this.set,
     required this.repRange,
@@ -741,6 +747,8 @@ class _SetEntryCard extends StatelessWidget {
     required this.suggestion,
     required this.onWeightChanged,
     required this.onRepsChanged,
+    required this.onUseLastSet,
+    required this.allowUseLastSet,
   });
 
   final WorkoutSet set;
@@ -750,9 +758,44 @@ class _SetEntryCard extends StatelessWidget {
   final SetProgressionSuggestion? suggestion;
   final ValueChanged<String> onWeightChanged;
   final ValueChanged<String> onRepsChanged;
+  final VoidCallback onUseLastSet;
+  final bool allowUseLastSet;
+
+  @override
+  State<_SetEntryCard> createState() => _SetEntryCardState();
+}
+
+class _SetEntryCardState extends State<_SetEntryCard> {
+  late final TextEditingController _weight =
+      TextEditingController(text: widget.progress.weight);
+  late final TextEditingController _reps =
+      TextEditingController(text: widget.progress.reps);
+
+  @override
+  void didUpdateWidget(covariant _SetEntryCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_weight.text != widget.progress.weight) {
+      _weight.text = widget.progress.weight;
+    }
+    if (_reps.text != widget.progress.reps) _reps.text = widget.progress.reps;
+  }
+
+  @override
+  void dispose() {
+    _weight.dispose();
+    _reps.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final WorkoutSet set = widget.set;
+    final WorkoutSetProgress progress = widget.progress;
+    final WorkoutSet? previousSet = widget.previousSet;
+    final SetProgressionSuggestion? suggestion = widget.suggestion;
+    final String? repRange = widget.repRange;
+    final ValueChanged<String> onWeightChanged = widget.onWeightChanged;
+    final ValueChanged<String> onRepsChanged = widget.onRepsChanged;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(8),
@@ -769,7 +812,7 @@ class _SetEntryCard extends StatelessWidget {
                   child: Text(
                     previousSet == null
                         ? 'Last: —'
-                        : 'Last: ${formatWorkoutWeight(previousSet!.weightKg)} kg × ${previousSet!.reps ?? '—'} reps',
+                        : 'Last: ${formatWorkoutWeight(previousSet.weightKg)} kg × ${previousSet.reps ?? '—'} reps',
                     key: ValueKey<String>('previous-${set.id}'),
                     textAlign: TextAlign.end,
                     style: Theme.of(context).textTheme.bodySmall,
@@ -777,13 +820,26 @@ class _SetEntryCard extends StatelessWidget {
                 ),
               ],
             ),
+            if (widget.allowUseLastSet &&
+                previousSet != null &&
+                previousSet.status == WorkoutSetStatus.completed &&
+                ((progress.weight.trim().isEmpty &&
+                        previousSet.weightKg != null) ||
+                    (progress.reps.trim().isEmpty && previousSet.reps != null)))
+              Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    key: ValueKey<String>('use-last-${set.id}'),
+                    onPressed: widget.onUseLastSet,
+                    child: const Text('Use last set'),
+                  )),
             const SizedBox(height: 4),
             Row(
               children: <Widget>[
                 Expanded(
                   child: TextFormField(
                     key: ValueKey<String>('weight-${set.id}'),
-                    initialValue: progress.weight,
+                    controller: _weight,
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
@@ -802,7 +858,7 @@ class _SetEntryCard extends StatelessWidget {
                 Expanded(
                   child: TextFormField(
                     key: ValueKey<String>('reps-${set.id}'),
-                    initialValue: progress.reps,
+                    controller: _reps,
                     keyboardType: TextInputType.number,
                     decoration: InputDecoration(
                       labelText: 'Reps',

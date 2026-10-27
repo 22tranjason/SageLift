@@ -78,6 +78,20 @@ class LocalWorkoutDraftRepository {
     );
   }
 
+  /// Reads the raw draft without allowing unknown fields to be discarded.
+  /// Cancellation refuses unsupported versions, corrupt data or extra fields.
+  Future<WorkoutDraft> loadForEmptyCancellation(String id) async {
+    await flush();
+    final Object? raw = await _store.read<Object>(_key(id));
+    final WorkoutDraft draft = await load(id);
+    if (raw != null &&
+        (raw is! String ||
+            !_sameJson(jsonDecode(raw), jsonDecode(_encode(draft))))) {
+      throw const FormatException('Unsupported workout draft.');
+    }
+    return draft;
+  }
+
   /// Queues every edit immediately and retains failed snapshots for retry.
   Future<void> save(WorkoutDraft draft) {
     _pending[draft.workoutId] = draft;
@@ -148,4 +162,13 @@ class LocalWorkoutDraftRepository {
       },
     });
   }
+}
+
+bool _sameJson(Object? first, Object? second) {
+  if (first is Map && second is Map) {
+    return first.length == second.length &&
+        first.keys.every((dynamic key) =>
+            second.containsKey(key) && _sameJson(first[key], second[key]));
+  }
+  return first == second;
 }
