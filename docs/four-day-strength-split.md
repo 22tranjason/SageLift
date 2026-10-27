@@ -15,13 +15,14 @@ warm-up; Saturday targets 65–75 minutes. Rest periods are between working sets
 |---|---|---|---|
 | Chest + Triceps | Barbell Bench Press | 3 × 4–6 | 180 sec |
 | | Incline Dumbbell Press | 3 × 8–10 | 120 sec |
-| | Cable Chest Fly | 3 × 10–15 | 75 sec |
+| | Dumbbell Fly (Flat Bench) | 3 × 10–15 | 75 sec |
 | | Overhead Triceps Extension (dumbbell) | 3 × 10–15 | 75 sec |
+| | Cable Triceps Pushdown | 3 × 10–15 | 75 sec |
 | Back + Biceps | Barbell Bent-Over Row | 3 × 6–8 | 150–180 sec |
 | | Cable Lat Pulldown | 3 × 8–12 | 120 sec |
-| | Chest-Supported Dumbbell Row on Incline Bench | 2 × 8–12 | 120 sec |
-| | Alternating Dumbbell Curl | 3 × 8–12 | 75 sec |
-| | Dumbbell Hammer Curl | 2 × 10–15 | 75 sec |
+| | Chest-Supported Dumbbell Row on Incline Bench | 3 × 8–12 | 120 sec |
+| | EZ-Bar Curl | 3 × 8–12 | 75 sec |
+| | Dumbbell Hammer Curl | 3 × 10–15 | 75 sec |
 | Shoulders + Traps | Standing Barbell Overhead Press | 3 × 4–6 | 180 sec |
 | | Dumbbell Lateral Raise | 3 × 12–15 | 75 sec |
 | | Dumbbell Rear-Delt Fly | 3 × 12–15 | 75 sec |
@@ -29,16 +30,16 @@ warm-up; Saturday targets 65–75 minutes. Rest periods are between working sets
 | Legs + Calves | Barbell Back Squat | 3 × 4–6 | 180 sec |
 | | Romanian Deadlift | 3 × 6–10 | 150–180 sec |
 | | Dumbbell Reverse Lunge | 2 × 8–12 per leg | 120 sec |
-| | Bodyweight Hamstring Walkout | 3 × 6–10 | 90 sec |
 | | Standing Dumbbell Calf Raise | 4 × 10–15 | 90 sec |
 
-Totals: 12, 13, 12 and 15 working sets. Unilateral sets include both sides.
-Hamstring walkouts need no accessory: keep hips comfortably raised and walk the
-heels out and back under control; one out-and-back cycle is one repetition. Use
-a short range initially. A standing cable leg curl (3 × 10–15 per leg, 90 sec
-rest) is an alternative only if a suitable ankle cuff is already available;
-standard cables alone do not establish that. No cable lateral raise or chest
-press machine is prescribed. Keep 2–3 repetitions in reserve and controlled
+Totals: 15, 15, 12 and 12 working sets. Unilateral sets include both sides.
+The Back + Biceps v2 update uses three sets for the supported row and hammer
+curl and replaces alternating curls with EZ-bar curls (3 × 8–12).
+The October 27 equipment update replaces cable chest fly with flat-bench dumbbell
+fly, adds cable triceps pushdown, and removes hamstring walkouts. Completed
+history and active or drafted sessions retain their original exercises. Existing
+exercise catalogue entries remain available for history and backup references.
+Keep 2–3 repetitions in reserve and controlled
 technique. No maximal attempts or mandatory failure. Once every working set
 reaches the top of its range with that reserve, add the smallest available
 weight next session. Reduce load or sets when recovery or technique suffers;

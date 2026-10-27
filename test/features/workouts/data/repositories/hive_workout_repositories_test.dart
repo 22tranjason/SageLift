@@ -71,8 +71,8 @@ void main() {
     );
     expect(pushA.warmUp, contains('8–10 min'));
     expect(pushA.sessionDurationTarget, 'About 50–60 min including warm-up');
-    expect(pushA.exerciseIds, hasLength(4));
-    expect(pushA.sets, hasLength(12));
+    expect(pushA.exerciseIds, hasLength(5));
+    expect(pushA.sets, hasLength(15));
     for (final Workout workout in hybridWorkouts) {
       expect(workout.conditioningPlan, isNull);
       expect(workout.conditioningResult, isNull);
@@ -160,7 +160,7 @@ void main() {
       );
       expect(
         legs.exerciseIds,
-        contains('seed-exercise-bodyweight-hamstring-walkout'),
+        isNot(contains('seed-exercise-bodyweight-hamstring-walkout')),
       );
       expect(legs.sessionDurationTarget, contains('65–75'));
     },
