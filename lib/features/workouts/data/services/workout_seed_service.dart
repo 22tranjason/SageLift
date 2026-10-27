@@ -4,8 +4,7 @@ import '../../domain/models/workout.dart';
 import '../../domain/models/workout_set.dart';
 import '../../domain/repositories/exercise_repository.dart';
 import '../../domain/repositories/workout_repository.dart';
-import '../../domain/services/back_biceps_program_v2.dart';
-import '../../domain/services/equipment_program_update.dart';
+import '../../domain/services/working_set_program.dart';
 import '../../domain/services/workout_program.dart';
 
 /// Adds future Hybrid templates without changing any historical records.
@@ -35,11 +34,8 @@ class WorkoutSeedService {
             'workouts.draft.v1.${workout.id}',
           ) !=
           null;
-      final Workout migrated = hasDraft
-          ? workout
-          : EquipmentProgramUpdate.migrateUnstarted(
-              BackBicepsProgramV2.migrateUnstarted(workout),
-            );
+      final Workout migrated =
+          hasDraft ? workout : WorkingSetProgram.migrateUnstarted(workout);
       final Workout cleaned = WorkoutProgram.withoutUnfinishedConditioning(
         migrated,
       );
@@ -343,7 +339,7 @@ class WorkoutSeedService {
         _ExercisePrescription(
           'seed-exercise-barbell-bench-press',
           6,
-          3,
+          4,
           'Target 4–6 reps; rest 180 sec; leave 2–3 reps in reserve; no mandatory failure.',
         ),
         _ExercisePrescription(
@@ -381,7 +377,7 @@ class WorkoutSeedService {
         _ExercisePrescription(
           'seed-exercise-barbell-bent-over-row',
           8,
-          3,
+          4,
           'Target 6–8 reps; rest 150–180 sec; leave 2–3 reps in reserve; no mandatory failure.',
         ),
         _ExercisePrescription(
@@ -419,7 +415,7 @@ class WorkoutSeedService {
         _ExercisePrescription(
           'seed-exercise-standing-barbell-overhead-press',
           6,
-          3,
+          4,
           'Target 4–6 reps; rest 180 sec; leave 2–3 reps in reserve; no mandatory failure.',
         ),
         _ExercisePrescription(
@@ -451,7 +447,7 @@ class WorkoutSeedService {
         _ExercisePrescription(
           'seed-exercise-barbell-back-squat',
           6,
-          3,
+          4,
           'Target 4–6 reps; rest 180 sec; leave 2–3 reps in reserve; no mandatory failure.',
         ),
         _ExercisePrescription(
@@ -463,7 +459,7 @@ class WorkoutSeedService {
         _ExercisePrescription(
           'seed-exercise-dumbbell-reverse-lunge',
           12,
-          2,
+          3,
           'Target 8–12 reps per leg; rest 120 sec; leave 2–3 reps in reserve; no mandatory failure.',
         ),
         _ExercisePrescription(

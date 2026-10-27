@@ -72,7 +72,7 @@ void main() {
     expect(pushA.warmUp, contains('8–10 min'));
     expect(pushA.sessionDurationTarget, 'About 50–60 min including warm-up');
     expect(pushA.exerciseIds, hasLength(5));
-    expect(pushA.sets, hasLength(15));
+    expect(pushA.sets, hasLength(16));
     for (final Workout workout in hybridWorkouts) {
       expect(workout.conditioningPlan, isNull);
       expect(workout.conditioningResult, isNull);
@@ -142,7 +142,7 @@ void main() {
       expect(current, hasLength(4));
       expect(current.map((Workout w) => w.id).toSet(), hasLength(4));
       for (final Workout w in current) {
-        expect(w.sets.length, inInclusiveRange(12, 15));
+        expect(w.sets.length, inInclusiveRange(13, 16));
         for (final WorkoutSet set in w.sets) {
           expect(
               const ExerciseProgressionService().repRangeFor(set), isNotNull);

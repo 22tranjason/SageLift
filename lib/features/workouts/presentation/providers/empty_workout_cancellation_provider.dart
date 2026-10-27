@@ -6,8 +6,7 @@ import '../../domain/models/workout.dart';
 import '../../domain/models/workout_draft.dart';
 import '../../domain/models/workout_set.dart';
 import '../../domain/repositories/workout_repository.dart';
-import '../../domain/services/back_biceps_program_v2.dart';
-import '../../domain/services/equipment_program_update.dart';
+import '../../domain/services/working_set_program.dart';
 import '../../domain/services/workout_program.dart';
 import 'today_workout_provider.dart';
 import 'workout_draft_controller.dart';
@@ -78,10 +77,8 @@ class EmptyWorkoutCancellation {
         throw StateError(
             'Only the current empty default workout can be cancelled.');
       }
-      final Workout planned = EquipmentProgramUpdate.migrateUnstarted(
-        BackBicepsProgramV2.migrateUnstarted(
-          original.copyWith(status: WorkoutStatus.planned, startedAt: null),
-        ),
+      final Workout planned = WorkingSetProgram.migrateUnstarted(
+        original.copyWith(status: WorkoutStatus.planned, startedAt: null),
       );
       final Workout? template =
           WorkoutSeedService.defaultTemplateFor(original.name);

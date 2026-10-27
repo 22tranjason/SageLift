@@ -61,7 +61,7 @@ void main() {
     final Workout legs =
         fresh.singleWhere((Workout w) => w.name == 'Legs + Calves');
     expect(chest.exerciseIds, hasLength(5));
-    expect(chest.sets, hasLength(15));
+    expect(chest.sets, hasLength(16));
     for (final String id in <String>[
       EquipmentProgramUpdate.dumbbellFly,
       EquipmentProgramUpdate.pushdown
@@ -86,7 +86,7 @@ void main() {
         hasLength(4));
 
     expect(legs.exerciseIds, hasLength(4));
-    expect(legs.sets, hasLength(12));
+    expect(legs.sets, hasLength(14));
     final List<Workout> originals = <Workout>[
       chest.copyWith(
         exerciseIds: chest.exerciseIds
@@ -213,7 +213,7 @@ void main() {
       expect(actual.id, original.id);
       expect(
           actual.exerciseIds, isChest ? chest.exerciseIds : legs.exerciseIds);
-      expect(actual.sets, hasLength(isChest ? 15 : 12));
+      expect(actual.sets, hasLength(isChest ? 16 : 14));
       for (final WorkoutSet set in original.sets) {
         if (set.exerciseId == EquipmentProgramUpdate.walkout) continue;
         final WorkoutSet migratedSet =

@@ -36,8 +36,9 @@ void main() {
             : id)
         .toList(),
     sets: current.sets
-        .where(
-            (WorkoutSet s) => s.exerciseId != EquipmentProgramUpdate.pushdown)
+        .where((WorkoutSet s) =>
+            s.exerciseId != EquipmentProgramUpdate.pushdown &&
+            (s.exerciseId != current.exerciseIds.first || s.setNumber <= 3))
         .map((WorkoutSet s) =>
             s.exerciseId == EquipmentProgramUpdate.dumbbellFly
                 ? s.copyWith(exerciseId: EquipmentProgramUpdate.cableFly)
@@ -78,10 +79,10 @@ void main() {
     expect(result.status, WorkoutStatus.planned);
     expect(result.startedAt, isNull);
     expect(result.exerciseIds, current.exerciseIds);
-    expect(result.sets, hasLength(15));
-    expect(result.sets.take(12).map((WorkoutSet s) => s.id),
-        old.sets.map((WorkoutSet s) => s.id));
-    expect(result.sets.map((WorkoutSet s) => s.id).toSet(), hasLength(15));
+    expect(result.sets, hasLength(16));
+    expect(result.sets.map((WorkoutSet s) => s.id),
+        containsAll(old.sets.map((WorkoutSet s) => s.id)));
+    expect(result.sets.map((WorkoutSet s) => s.id).toSet(), hasLength(16));
     expect(store.values.containsKey('workouts.draft.v1.${old.id}'), isFalse);
     expect(
         (await container.read(workoutDraftControllerProvider(old.id).future))
