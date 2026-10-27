@@ -4,7 +4,7 @@ On Today, an active workout offers **Cancel Workout**. The confirmation buttons
 are **Keep workout** and **Cancel empty workout**. Confirming resets only that
 selected active session when its stored sets and raw draft have no entered
 values. It remains planned, keeps its workout and retained set IDs, and receives
-any existing approved equipment-plan migration. It does not create a completion,
+the approved equipment and working-set migrations. It does not create a completion,
 skip the workout, advance the rotation or delete history. Cancellation works
 across midnight for the same empty active session.
 
@@ -13,6 +13,7 @@ If that recommendation differs from the cancelled workout, use **Choose Workout*
 to select it explicitly. Cancelling does not change the recommendation history.
 For Chest + Triceps the latest plan has five exercises: bench, incline dumbbell
 press, flat-bench dumbbell fly, overhead dumbbell extension and cable pushdown.
+Bench has four working sets and the other four exercises have three each.
 
 Cancellation flushes pending writes, validates raw draft structure, refuses
 entered/unknown/corrupt drafts and custom plans, and rechecks the stored record.

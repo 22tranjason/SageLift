@@ -13,26 +13,26 @@ warm-up; Saturday targets 65–75 minutes. Rest periods are between working sets
 
 | Session | Exercise | Sets × reps | Rest |
 |---|---|---|---|
-| Chest + Triceps | Barbell Bench Press | 3 × 4–6 | 180 sec |
+| Chest + Triceps | Barbell Bench Press | 4 × 4–6 | 180 sec |
 | | Incline Dumbbell Press | 3 × 8–10 | 120 sec |
 | | Dumbbell Fly (Flat Bench) | 3 × 10–15 | 75 sec |
 | | Overhead Triceps Extension (dumbbell) | 3 × 10–15 | 75 sec |
 | | Cable Triceps Pushdown | 3 × 10–15 | 75 sec |
-| Back + Biceps | Barbell Bent-Over Row | 3 × 6–8 | 150–180 sec |
+| Back + Biceps | Barbell Bent-Over Row | 4 × 6–8 | 150–180 sec |
 | | Cable Lat Pulldown | 3 × 8–12 | 120 sec |
 | | Chest-Supported Dumbbell Row on Incline Bench | 3 × 8–12 | 120 sec |
 | | EZ-Bar Curl | 3 × 8–12 | 75 sec |
 | | Dumbbell Hammer Curl | 3 × 10–15 | 75 sec |
-| Shoulders + Traps | Standing Barbell Overhead Press | 3 × 4–6 | 180 sec |
+| Shoulders + Traps | Standing Barbell Overhead Press | 4 × 4–6 | 180 sec |
 | | Dumbbell Lateral Raise | 3 × 12–15 | 75 sec |
 | | Dumbbell Rear-Delt Fly | 3 × 12–15 | 75 sec |
 | | Dumbbell Shrug | 3 × 10–15 | 90 sec |
-| Legs + Calves | Barbell Back Squat | 3 × 4–6 | 180 sec |
+| Legs + Calves | Barbell Back Squat | 4 × 4–6 | 180 sec |
 | | Romanian Deadlift | 3 × 6–10 | 150–180 sec |
-| | Dumbbell Reverse Lunge | 2 × 8–12 per leg | 120 sec |
+| | Dumbbell Reverse Lunge | 3 × 8–12 per leg | 120 sec |
 | | Standing Dumbbell Calf Raise | 4 × 10–15 | 90 sec |
 
-Totals: 15, 15, 12 and 12 working sets. Unilateral sets include both sides.
+Totals: 16, 16, 13 and 14 working sets. Unilateral sets include both sides.
 The Back + Biceps v2 update uses three sets for the supported row and hammer
 curl and replaces alternating curls with EZ-bar curls (3 × 8–12).
 The October 27 equipment update replaces cable chest fly with flat-bench dumbbell
@@ -55,6 +55,19 @@ but do not determine the new rotation; it begins at Chest + Triceps, then follow
 completions of the four new sessions. Old planned records remain stored but are
 not offered in Choose Workout. Existing unfinished-conditioning cleanup is
 unchanged. The persisted track enum remains unchanged for Hive compatibility.
+
+The working-set update gives the first exercise four working sets and every
+other exercise at least three; calf raises retain four. Current reps and rests
+stay unchanged. Startup and clean future-session cloning share one recognised
+four-day-default migration. It handles original two-set supported rows and hammer
+curls (including mixed old/new curl IDs), two-set reverse lunges, and the prior
+equipment plans. Retained set IDs and prescriptions stay unchanged; new sets get
+unique deterministic IDs. Any saved draft, active/started/performed session or
+custom prescription is protected. Backups keep factual history; restoring an
+older backup is upgraded on startup or on clean future-session creation. An
+explicit empty-session cancellation uses the same migration after confirmation.
+The suggested duration labels remain estimates; working-set totals above are
+exact and warm-up sets are additional.
 
 ## Phone delivery
 

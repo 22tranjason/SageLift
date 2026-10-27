@@ -154,7 +154,7 @@ void main() {
       final Workout actual = (await reopened.workoutRepository.getById(v1.id))!;
       expect(actual.id, v1.id);
       expect(actual.exerciseIds, v2.exerciseIds);
-      expect(actual.sets, hasLength(15));
+      expect(actual.sets, hasLength(16));
       for (final String id in <String>[row, newCurl, hammer]) {
         final List<WorkoutSet> sets = actual.sets
             .where((WorkoutSet set) => set.exerciseId == id)
@@ -208,10 +208,10 @@ void main() {
         scheduledDate: DateTime.utc(2026, 10, 22),
       );
       expect(future.exerciseIds, v2.exerciseIds);
-      expect(future.sets, hasLength(15));
+      expect(future.sets, hasLength(16));
       expect(
         future.sets.map((WorkoutSet set) => set.id).toSet(),
-        hasLength(15),
+        hasLength(16),
       );
       expect(
         future.sets.every(
