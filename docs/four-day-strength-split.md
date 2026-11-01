@@ -25,6 +25,7 @@ warm-up; Saturday targets 65–75 minutes. Rest periods are between working sets
 | | Dumbbell Hammer Curl | 3 × 10–15 | 75 sec |
 | Shoulders + Traps | Standing Barbell Overhead Press | 4 × 4–6 | 180 sec |
 | | Dumbbell Lateral Raise | 3 × 12–15 | 75 sec |
+| | High Pulls (controlled EZ-bar upright rows) | 3 sets; reps not prescribed | — |
 | | Dumbbell Rear-Delt Fly | 3 × 12–15 | 75 sec |
 | | Dumbbell Shrug | 3 × 10–15 | 90 sec |
 | Legs + Calves | Barbell Back Squat | 4 × 4–6 | 180 sec |
@@ -32,7 +33,7 @@ warm-up; Saturday targets 65–75 minutes. Rest periods are between working sets
 | | Dumbbell Reverse Lunge | 3 × 8–12 per leg | 120 sec |
 | | Standing Dumbbell Calf Raise | 4 × 10–15 | 90 sec |
 
-Totals: 16, 16, 13 and 14 working sets. Unilateral sets include both sides.
+Totals: 16, 16, 16 and 14 working sets. Unilateral sets include both sides.
 The Back + Biceps v2 update uses three sets for the supported row and hammer
 curl and replaces alternating curls with EZ-bar curls (3 × 8–12).
 The October 27 equipment update replaces cable chest fly with flat-bench dumbbell

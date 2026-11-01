@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/workouts/presentation/screens/exercise_screen.dart';
+import '../../features/workouts/presentation/screens/progress_screen.dart';
 import '../../features/workouts/presentation/screens/today_screen.dart';
 import '../../features/workouts/presentation/screens/workout_details_screen.dart';
 import '../../features/workouts/presentation/screens/workout_history_screen.dart';
@@ -14,6 +15,9 @@ import '../../features/workouts/presentation/screens/workout_summary_screen.dart
 enum AppRoute {
   /// The default daily dashboard route.
   today,
+
+  /// Per-exercise local workout history chart.
+  progress,
 
   /// The temporary route shown after starting a workout.
   workoutOverview,
@@ -46,6 +50,11 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((Ref ref) {
           return const TodayScreen();
         },
       ),
+      GoRoute(
+          path: '/progress',
+          name: AppRoute.progress.name,
+          builder: (BuildContext context, GoRouterState state) =>
+              const ProgressScreen()),
       GoRoute(
         path: '/settings',
         name: AppRoute.settings.name,

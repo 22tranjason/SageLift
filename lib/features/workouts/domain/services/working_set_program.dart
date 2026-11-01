@@ -42,6 +42,9 @@ class WorkingSetProgram {
     'Shoulders + Traps': <_Prescription>[
       _Prescription('standing-barbell-overhead-press', 6, '4–6', '180', 4, 3),
       _Prescription('dumbbell-lateral-raise', 15, '12–15', '75', 3, 3),
+      _Prescription('ez-bar-upright-row', null, '', '', 3, 3,
+          notes:
+              'Controlled EZ-bar upright rows. Reps are not prescribed; enter the reps you perform.'),
       _Prescription('dumbbell-rear-delt-fly', 15, '12–15', '75', 3, 3),
       _Prescription('dumbbell-shrug', 15, '10–15', '90', 3, 3),
     ],
@@ -98,7 +101,15 @@ class WorkingSetProgram {
     ];
     final bool oldLegs =
         workout.name == 'Legs + Calves' && ids.join('|') == oldLegIds.join('|');
-    if (ids.join('|') != targetIds.join('|') && !oldChest && !oldLegs) {
+    final bool oldShoulders = workout.name == 'Shoulders + Traps' &&
+        ids.join('|') ==
+            targetIds
+                .where((String id) => id != 'seed-exercise-ez-bar-upright-row')
+                .join('|');
+    if (ids.join('|') != targetIds.join('|') &&
+        !oldChest &&
+        !oldLegs &&
+        !oldShoulders) {
       return workout;
     }
     final Map<String, List<WorkoutSet>> byId = <String, List<WorkoutSet>>{};
@@ -168,7 +179,7 @@ class _Prescription {
       {String? notes})
       : _notes = notes;
   final String name;
-  final int reps;
+  final int? reps;
   final String range;
   final String rest;
   final int count;
