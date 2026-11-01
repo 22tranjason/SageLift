@@ -21,8 +21,12 @@ While it runs, the same session cannot accept edits, finish, start or be replace
 Only a verified-empty draft is removed; failures reload the persisted lifecycle
 state and can be retried. Publishing this feature does not cancel any session.
 
-On an exercise, **Use last set** appears beside a set when actual completed
-previous-session values can fill at least one blank field. It fills only blank
-weight/reps fields, preserves partial input, and leaves values editable. Missing
-history or missing values are not invented. The action uses the existing draft
-save/retry path and does not complete a set or workout.
+On an exercise, **Copy set above** replaces the previous **Use last set** action.
+It copies valid weight/reps from the immediately preceding numbered set of the
+same exercise in the current workout. It never copies from workout history.
+Only blank destination fields are filled; partial entries and persisted actual
+values are retained. The first set or a missing/empty/invalid preceding set offers
+no copy action. Copied values remain editable and use the existing draft save /
+retry path; nothing is logged or completed automatically on rendering.
+
+The historical **Last:** label remains a reference only, separate from copying.

@@ -83,7 +83,7 @@ void main() {
         fresh
             .singleWhere((Workout w) => w.name == 'Shoulders + Traps')
             .exerciseIds,
-        hasLength(4));
+        hasLength(5));
 
     expect(legs.exerciseIds, hasLength(4));
     expect(legs.sets, hasLength(14));

@@ -10,6 +10,7 @@ import '../../domain/models/exercise.dart';
 import '../../domain/models/workout.dart';
 import '../../domain/models/workout_draft.dart';
 import '../../domain/models/workout_set.dart';
+import '../../domain/services/current_set_copy.dart';
 import '../../domain/services/exercise_progression_service.dart';
 import '../formatters/workout_weight_format.dart';
 import '../providers/today_workout_provider.dart';
@@ -173,6 +174,7 @@ class _ExerciseContent extends ConsumerWidget {
               ],
             ),
           Text(exercise.name, style: Theme.of(context).textTheme.headlineSmall),
+          if (exercise.instructions != null) Text(exercise.instructions!),
           if (repRange != null || restGuidance != null)
             Text(
               <String>[
@@ -223,15 +225,27 @@ class _ExerciseContent extends ConsumerWidget {
             _SetEntryCard(
               set: set,
               repRange: progressionService.repRangeFor(set)?.display,
-              progress: progress[set.id] ?? const WorkoutSetProgress(),
+              progress: progress[set.id] ??
+                  WorkoutSetProgress(
+                    weight: set.weightKg == null
+                        ? ''
+                        : formatWorkoutWeight(set.weightKg),
+                    reps: set.reps?.toString() ?? '',
+                  ),
               previousSet:
                   _previousSet(previousPerformance.valueOrNull, set.setNumber),
               suggestion: _setSuggestion(guidance.valueOrNull, set.setNumber),
-              allowUseLastSet: !workoutIsCompleted,
-              onUseLastSet: () {
-                final WorkoutSet? previous = _previousSet(
-                    previousPerformance.valueOrNull, set.setNumber);
-                if (previous != null) controller.useLastSet(set.id, previous);
+              copySource: CurrentSetCopy.source(set, sets, progress),
+              allowCopySetAbove: !workoutIsCompleted,
+              onCopySetAbove: () {
+                unawaited(
+                    controller.copySetAbove(set.id).catchError((Object _) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content: Text(
+                            'Unable to copy this set. Please try again.')));
+                  }
+                }));
               },
               onWeightChanged: (String weight) {
                 controller.updateWeight(set.id, weight);
@@ -747,8 +761,9 @@ class _SetEntryCard extends StatefulWidget {
     required this.suggestion,
     required this.onWeightChanged,
     required this.onRepsChanged,
-    required this.onUseLastSet,
-    required this.allowUseLastSet,
+    required this.onCopySetAbove,
+    required this.allowCopySetAbove,
+    required this.copySource,
   });
 
   final WorkoutSet set;
@@ -758,8 +773,9 @@ class _SetEntryCard extends StatefulWidget {
   final SetProgressionSuggestion? suggestion;
   final ValueChanged<String> onWeightChanged;
   final ValueChanged<String> onRepsChanged;
-  final VoidCallback onUseLastSet;
-  final bool allowUseLastSet;
+  final VoidCallback onCopySetAbove;
+  final bool allowCopySetAbove;
+  final WorkoutSetProgress? copySource;
 
   @override
   State<_SetEntryCard> createState() => _SetEntryCardState();
@@ -820,18 +836,18 @@ class _SetEntryCardState extends State<_SetEntryCard> {
                 ),
               ],
             ),
-            if (widget.allowUseLastSet &&
-                previousSet != null &&
-                previousSet.status == WorkoutSetStatus.completed &&
+            if (widget.allowCopySetAbove &&
+                widget.copySource != null &&
                 ((progress.weight.trim().isEmpty &&
-                        previousSet.weightKg != null) ||
-                    (progress.reps.trim().isEmpty && previousSet.reps != null)))
+                        widget.copySource!.weight.isNotEmpty) ||
+                    (progress.reps.trim().isEmpty &&
+                        widget.copySource!.reps.isNotEmpty)))
               Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
-                    key: ValueKey<String>('use-last-${set.id}'),
-                    onPressed: widget.onUseLastSet,
-                    child: const Text('Use last set'),
+                    key: ValueKey<String>('copy-above-${set.id}'),
+                    onPressed: widget.onCopySetAbove,
+                    child: const Text('Copy set above'),
                   )),
             const SizedBox(height: 4),
             Row(

@@ -79,46 +79,53 @@ void main() {
       tester.widget<TextField>(field(label)).controller!.text;
 
   testWidgets(
-      'Use last set appears only with actual history and updates visible editable fields',
+      'Copy set above uses current 80 x 6 rather than historical 70 x 10',
       (WidgetTester tester) async {
-    final Workout base = draftTestWorkout(track: WorkoutTrack.hybrid);
-    final Workout prior = base.copyWith(
+    final Workout one = draftTestWorkout(track: WorkoutTrack.hybrid);
+    final Workout base = one.copyWith(sets: <WorkoutSet>[
+      one.sets.first,
+      one.sets.first.copyWith(id: 'set-2', setNumber: 2),
+    ]);
+    final Workout prior = one.copyWith(
         id: 'prior',
         status: WorkoutStatus.completed,
         completedAt: DateTime.utc(2026, 9, 20),
         sets: <WorkoutSet>[
-          base.sets.single.copyWith(
-              status: WorkoutSetStatus.completed, weightKg: 22.5, reps: 12),
+          one.sets.first.copyWith(
+              status: WorkoutSetStatus.completed, weightKg: 70.0, reps: 10),
         ]);
     await open(tester, sessions: <Workout>[base, prior]);
-    expect(find.text('Use last set'), findsOneWidget);
-    expect(textOf(tester, 'Weight (kg)'), '');
-    expect(workouts.values['push'], base);
-    await tester.enterText(field('Weight (kg)'), '30');
+    expect(find.text('Copy set above'), findsNothing);
+    await tester.enterText(
+        find.byKey(const ValueKey<String>('weight-set-1')), '80');
+    await tester.enterText(
+        find.byKey(const ValueKey<String>('reps-set-1')), '6');
     await tester.pumpAndSettle();
-    await tap(tester, 'Use last set');
-    expect(textOf(tester, 'Weight (kg)'), '30');
-    expect(textOf(tester, 'Reps'), '12');
-    expect(find.text('Use last set'), findsNothing);
-    await tester.enterText(field('Reps'), '11');
+    await tap(tester, 'Copy set above');
+    final Finder secondWeight = find.descendant(
+        of: find.byKey(const ValueKey<String>('weight-set-2')),
+        matching: find.byType(TextField));
+    final Finder secondReps = find.descendant(
+        of: find.byKey(const ValueKey<String>('reps-set-2')),
+        matching: find.byType(TextField));
+    expect(tester.widget<TextField>(secondWeight).controller!.text, '80');
+    expect(tester.widget<TextField>(secondReps).controller!.text, '6');
+    await tester.enterText(secondReps, '5');
     await tester.pumpAndSettle();
-    expect(textOf(tester, 'Reps'), '11');
     await container.read(workoutDraftRepositoryProvider).flush();
     expect(
         (await container.read(workoutDraftRepositoryProvider).load('push'))
-            .sets['set-1']
+            .sets['set-2']
             ?.reps,
-        '11');
+        '5');
     expect(workouts.values['push'], base);
     expect(workouts.values['prior'], prior);
   });
 
-  testWidgets('Use last set is absent without history',
+  testWidgets('First set has no copy source even when history exists',
       (WidgetTester tester) async {
     await open(tester, hybrid: true);
-    expect(find.text('Use last set'), findsNothing);
-    expect(textOf(tester, 'Weight (kg)'), '');
-    expect(textOf(tester, 'Reps'), '');
+    expect(find.text('Copy set above'), findsNothing);
   });
 
   testWidgets(

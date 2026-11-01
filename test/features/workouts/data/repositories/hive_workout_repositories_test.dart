@@ -144,6 +144,10 @@ void main() {
       for (final Workout w in current) {
         expect(w.sets.length, inInclusiveRange(13, 16));
         for (final WorkoutSet set in w.sets) {
+          if (set.exerciseId == 'seed-exercise-ez-bar-upright-row') {
+            expect(set.targetReps, isNull);
+            continue;
+          }
           expect(
               const ExerciseProgressionService().repRangeFor(set), isNotNull);
           expect(const ExerciseProgressionService().restGuidanceFor(set),

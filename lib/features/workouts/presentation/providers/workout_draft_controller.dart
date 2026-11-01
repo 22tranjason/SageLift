@@ -7,6 +7,7 @@ import '../../data/repositories/local_workout_draft_repository.dart';
 import '../../domain/models/workout.dart';
 import '../../domain/models/workout_draft.dart';
 import '../../domain/models/workout_set.dart';
+import '../../domain/services/current_set_copy.dart';
 import 'today_workout_provider.dart';
 
 /// Shares one serialized write queue across all workout sessions.
@@ -76,18 +77,38 @@ class WorkoutDraftController extends FamilyAsyncNotifier<WorkoutDraft, String> {
     }));
   }
 
-  /// Explicitly fills blank fields from a performed set; existing input wins.
-  void useLastSet(String setId, WorkoutSet previous) {
-    if (previous.status != WorkoutSetStatus.completed) return;
+  /// Copies only blank fields from the set above in this same workout.
+  Future<void> copySetAbove(String setId) async {
+    await future;
+    if (ref.read(workoutDraftFinishingProvider(arg))) return;
+    final Workout? workout =
+        await ref.read(workoutRepositoryProvider).getById(arg);
+    if (workout == null ||
+        (workout.status != WorkoutStatus.inProgress &&
+            workout.status != WorkoutStatus.planned)) {
+      return;
+    }
+    final List<WorkoutSet> targets =
+        workout.sets.where((WorkoutSet s) => s.id == setId).toList();
+    if (targets.length != 1) return;
     final WorkoutDraft current = state.requireValue;
-    final WorkoutSetProgress entry =
-        current.sets[setId] ?? const WorkoutSetProgress();
+    final WorkoutSetProgress? source =
+        CurrentSetCopy.source(targets.single, workout.sets, current.sets);
+    if (source == null) return;
+    final WorkoutSetProgress entry = current.sets[setId] ??
+        WorkoutSetProgress(
+          weight: targets.single.weightKg
+                  ?.toString()
+                  .replaceFirst(RegExp(r'\.0$'), '') ??
+              '',
+          reps: targets.single.reps?.toString() ?? '',
+        );
     final String weight =
-        entry.weight.trim().isEmpty && previous.weightKg != null
-            ? previous.weightKg.toString().replaceFirst(RegExp(r'\.0$'), '')
+        entry.weight.trim().isEmpty && source.weight.isNotEmpty
+            ? source.weight
             : entry.weight;
-    final String reps = entry.reps.trim().isEmpty && previous.reps != null
-        ? previous.reps.toString()
+    final String reps = entry.reps.trim().isEmpty && source.reps.isNotEmpty
+        ? source.reps
         : entry.reps;
     if (weight == entry.weight && reps == entry.reps) return;
     _update(current.copyWith(sets: <String, WorkoutSetProgress>{

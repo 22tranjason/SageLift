@@ -44,6 +44,10 @@ class TodayScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Today'),
         actions: <Widget>[
+          IconButton(
+              tooltip: 'Progress',
+              icon: const Icon(Icons.show_chart),
+              onPressed: () => context.pushNamed(AppRoute.progress.name)),
           TextButton(
             onPressed: () {
               unawaited(context.pushNamed(AppRoute.workoutHistory.name));

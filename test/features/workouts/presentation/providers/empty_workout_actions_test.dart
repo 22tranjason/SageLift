@@ -297,56 +297,72 @@ void main() {
   });
 
   test(
-      'use last set fills only blank editable draft fields and persists without completion',
+      'copy above uses today input, fills blanks, persists edits and never completes',
       () async {
     open();
     await container.read(workoutDraftControllerProvider(old.id).future);
     final controller =
         container.read(workoutDraftControllerProvider(old.id).notifier);
-    final WorkoutSet previous = old.sets.first
-        .copyWith(status: WorkoutSetStatus.completed, weightKg: 22.5, reps: 12);
-    controller.updateWeight(old.sets.first.id, '30');
-    controller.useLastSet(old.sets.first.id, previous);
+    final String first = old.sets[0].id,
+        second = old.sets[1].id,
+        third = old.sets[2].id;
+    await controller.copySetAbove(first);
+    expect(
+        container
+            .read(workoutDraftControllerProvider(old.id))
+            .requireValue
+            .sets,
+        isEmpty);
+    controller.updateWeight(first, '80');
+    controller.updateReps(first, '6');
+    controller.updateWeight(second, '85');
+    await controller.copySetAbove(second);
     await container.read(workoutDraftRepositoryProvider).flush();
     WorkoutDraft saved =
         await container.read(workoutDraftRepositoryProvider).load(old.id);
-    expect(saved.sets[old.sets.first.id]?.weight, '30');
-    expect(saved.sets[old.sets.first.id]?.reps, '12');
-    controller.updateReps(old.sets.first.id, '11');
-    controller.useLastSet(old.sets.first.id, previous);
-    await container.read(workoutDraftRepositoryProvider).flush();
-    saved = await container.read(workoutDraftRepositoryProvider).load(old.id);
-    expect(saved.sets[old.sets.first.id]?.reps, '11');
-    expect(workouts.values[old.id], old);
-    controller.useLastSet(
-        old.sets[1].id, previous.copyWith(weightKg: null, reps: null));
-    controller.useLastSet(
-        old.sets[1].id, previous.copyWith(status: WorkoutSetStatus.planned));
+    expect(saved.sets[second]?.weight, '85');
+    expect(saved.sets[second]?.reps, '6');
+    controller.updateReps(second, '5');
+    await controller.copySetAbove(second);
     expect(
         container
             .read(workoutDraftControllerProvider(old.id))
             .requireValue
-            .sets
-            .containsKey(old.sets[1].id),
-        isFalse);
+            .sets[second]
+            ?.reps,
+        '5');
     store.failWrites = true;
-    controller.useLastSet(old.sets[1].id, previous);
+    await controller.copySetAbove(third);
     await Future<void>.delayed(Duration.zero);
     expect(container.read(workoutDraftSaveProvider(old.id)).hasError, isTrue);
-    expect(
-        container
-            .read(workoutDraftControllerProvider(old.id))
-            .requireValue
-            .sets[old.sets[1].id]
-            ?.weight,
-        '22.5');
     store.failWrites = false;
     await controller.retrySave();
-    expect(
-        (await container.read(workoutDraftRepositoryProvider).load(old.id))
-            .sets[old.sets[1].id]
-            ?.weight,
-        '22.5');
+    saved = await container.read(workoutDraftRepositoryProvider).load(old.id);
+    expect(saved.sets[third]?.weight, '85');
+    expect(saved.sets[third]?.reps, '5');
+    expect(workouts.values[old.id], old);
+    expect(workouts.values['history'], history);
+  });
+  test('copy above retains actual values already stored on destination set',
+      () async {
+    final Workout stored = old.copyWith(sets: <WorkoutSet>[
+      old.sets.first,
+      old.sets[1].copyWith(weightKg: 90.0),
+      ...old.sets.skip(2)
+    ]);
+    open(stored);
+    await container.read(workoutDraftControllerProvider(old.id).future);
+    final controller =
+        container.read(workoutDraftControllerProvider(old.id).notifier);
+    controller.updateWeight(old.sets.first.id, '80');
+    controller.updateReps(old.sets.first.id, '6');
+    await controller.copySetAbove(old.sets[1].id);
+    await container.read(workoutDraftRepositoryProvider).flush();
+    final WorkoutDraft saved =
+        await container.read(workoutDraftRepositoryProvider).load(old.id);
+    expect(saved.sets[old.sets[1].id]?.weight, '90');
+    expect(saved.sets[old.sets[1].id]?.reps, '6');
+    expect(workouts.values[old.id], stored);
   });
 }
 

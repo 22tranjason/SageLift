@@ -52,6 +52,17 @@ void main() {
         .seedIfEmpty();
     for (final Workout w in await r.workoutRepository.getAll()) {
       _expectCounts(w);
+      if (w.name == 'Shoulders + Traps') {
+        expect(w.exerciseIds[2], 'seed-exercise-ez-bar-upright-row');
+        expect(
+            w.sets
+                .where((WorkoutSet s) => s.exerciseId == w.exerciseIds[2])
+                .every((WorkoutSet s) => s.targetReps == null),
+            isTrue);
+        final exercise = await r.exerciseRepository.getById(w.exerciseIds[2]);
+        expect(exercise?.name, 'High Pulls');
+        expect(exercise?.instructions, contains('upright row'));
+      }
       expect(WorkingSetProgram.migrateUnstarted(w), same(w));
     }
   });
@@ -263,18 +274,22 @@ void main() {
 
 Workout _old(Workout current, {int row = 3, int hammer = 2}) =>
     current.copyWith(
+        exerciseIds: current.exerciseIds
+            .where((String id) => id != 'seed-exercise-ez-bar-upright-row')
+            .toList(),
         sets: current.sets.where((WorkoutSet s) {
-      final int count = s.exerciseId == current.exerciseIds.first
-          ? 3
-          : s.exerciseId == 'seed-exercise-dumbbell-reverse-lunge'
-              ? 2
-              : s.exerciseId == 'seed-exercise-chest-supported-dumbbell-row'
-                  ? row
-                  : s.exerciseId == 'seed-exercise-dumbbell-hammer-curl'
-                      ? hammer
-                      : 99;
-      return s.setNumber <= count;
-    }).toList());
+          final int count = s.exerciseId == current.exerciseIds.first
+              ? 3
+              : s.exerciseId == 'seed-exercise-dumbbell-reverse-lunge'
+                  ? 2
+                  : s.exerciseId == 'seed-exercise-chest-supported-dumbbell-row'
+                      ? row
+                      : s.exerciseId == 'seed-exercise-dumbbell-hammer-curl'
+                          ? hammer
+                          : 99;
+          return s.exerciseId != 'seed-exercise-ez-bar-upright-row' &&
+              s.setNumber <= count;
+        }).toList());
 
 void _expectCounts(Workout w) {
   final List<String> expected =

@@ -115,6 +115,15 @@ class WorkoutSeedService {
   }
 
   static final List<Exercise> _hybridExercises = <Exercise>[
+    const Exercise(
+      id: 'seed-exercise-ez-bar-upright-row',
+      name: 'High Pulls',
+      category: ExerciseCategory.strength,
+      equipment: Equipment.barbell,
+      primaryMuscleGroup: MuscleGroup.shoulders,
+      instructions:
+          'Controlled EZ-bar upright rows. Raise the bar with elbows leading; this is an upright row, not an explosive high pull.',
+    ),
     _exercise(
       'seed-exercise-barbell-bench-press',
       'Barbell Bench Press',
@@ -425,6 +434,12 @@ class WorkoutSeedService {
           'Target 12–15 reps; rest 75 sec; leave 2–3 reps in reserve; no mandatory failure.',
         ),
         _ExercisePrescription(
+          'seed-exercise-ez-bar-upright-row',
+          null,
+          3,
+          'Controlled EZ-bar upright rows. Reps are not prescribed; enter the reps you perform.',
+        ),
+        _ExercisePrescription(
           'seed-exercise-dumbbell-rear-delt-fly',
           15,
           3,
@@ -535,7 +550,7 @@ class _ExercisePrescription {
   );
 
   final String exerciseId;
-  final int targetReps;
+  final int? targetReps;
   final int setCount;
   final String notes;
 }
