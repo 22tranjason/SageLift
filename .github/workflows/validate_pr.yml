@@ -1,0 +1,40 @@
+name: Validate SageLift pull request
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact proposed commit
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test web release bootstrap
+        run: node --test test/web/deployment_bootstrap_test.cjs
+
+      - name: Test
+        run: flutter test
+
+      - name: Build review web app
+        run: flutter build web --release --base-href "/SageLift/" --dart-define=SAGELIFT_BUILD_ID="review-${{ github.event.pull_request.head.sha }}"
