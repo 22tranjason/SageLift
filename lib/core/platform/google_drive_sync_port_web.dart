@@ -68,7 +68,7 @@ class _WebGoogleDriveSyncPort implements GoogleDriveSyncPort {
 
   @override
   Future<void> authorize(String clientId) {
-    if (_google == null) {
+    if (_googleGlobal == null) {
       return Future<void>.error(
         StateError('Google sign-in is still loading. Try again shortly.'),
       );
@@ -77,7 +77,7 @@ class _WebGoogleDriveSyncPort implements GoogleDriveSyncPort {
     final Completer<void> pending = Completer<void>();
     try {
       final _GoogleTokenClient client = _initGoogleTokenClient(
-        _GoogleTokenOptions(
+        _GoogleTokenClientConfig(
           client_id: clientId,
           scope: _scope,
           callback: ((_GoogleTokenResponse response) {
@@ -219,35 +219,4 @@ class _WebGoogleDriveSyncPort implements GoogleDriveSyncPort {
     _token = null;
     _expiresAt = null;
   }
-}
-
-@JS('google')
-external JSObject? get _google;
-
-@JS('google.accounts.oauth2.initTokenClient')
-external _GoogleTokenClient _initGoogleTokenClient(
-  _GoogleTokenOptions options,
-);
-
-@JS()
-extension type _GoogleTokenOptions(JSObject _) implements JSObject {
-  external _GoogleTokenOptions({
-    required String client_id,
-    required String scope,
-    required JSFunction callback,
-    required JSFunction error_callback,
-  });
-}
-
-@JS()
-extension type _GoogleTokenClient(JSObject _) implements JSObject {
-  external void requestAccessToken();
-}
-
-@JS()
-extension type _GoogleTokenResponse(JSObject _) implements JSObject {
-  external String? get error;
-  external String? get scope;
-  external String? get access_token;
-  external int? get expires_in;
 }
