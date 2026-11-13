@@ -68,51 +68,46 @@ class _WebGoogleDriveSyncPort implements GoogleDriveSyncPort {
 
   @override
   Future<void> authorize(String clientId) {
-    if (_googleGlobal == null) {
+    if (_google == null) {
       return Future<void>.error(
         StateError('Google sign-in is still loading. Try again shortly.'),
       );
     }
 
     final Completer<void> pending = Completer<void>();
-    void handleToken(JSObject raw) {
-      if (pending.isCompleted) return;
-      final _GoogleTokenResponse response = _GoogleTokenResponse(raw);
-      final String? token = response.access_token;
-      if (response.error != null ||
-          token == null ||
-          !(response.scope ?? '').split(' ').contains(_scope)) {
-        pending.completeError(
-          StateError('Google Drive permission was not granted.'),
-        );
-        return;
-      }
-      final int seconds = response.expires_in ?? 3600;
-      _token = token;
-      _expiresAt = DateTime.now()
-          .add(Duration(seconds: seconds > 90 ? seconds - 60 : 30));
-      pending.complete();
-    }
-
-    void handleError(JSObject error) {
-      if (!pending.isCompleted) {
-        pending.completeError(
-          StateError('Google sign-in closed or was blocked.'),
-        );
-      }
-    }
-
     try {
-      final _GoogleTokenClient tokenClient = _initGoogleTokenClient(
-        _GoogleTokenClientConfig(
+      final _GoogleTokenClient client = _initGoogleTokenClient(
+        _GoogleTokenOptions(
           client_id: clientId,
           scope: _scope,
-          callback: handleToken.toJS,
-          error_callback: handleError.toJS,
+          callback: ((_GoogleTokenResponse response) {
+            if (pending.isCompleted) return;
+            final String scopes = response.scope ?? '';
+            if (response.error != null ||
+                response.access_token == null ||
+                !scopes.split(' ').contains(_scope)) {
+              pending.completeError(
+                StateError('Google Drive permission was not granted.'),
+              );
+              return;
+            }
+            final int seconds = response.expires_in ?? 3600;
+            _token = response.access_token;
+            _expiresAt = DateTime.now()
+                .add(Duration(seconds: seconds > 90 ? seconds - 60 : 30));
+            pending.complete();
+          }).toJS,
+          error_callback: ((JSAny? _) {
+            if (!pending.isCompleted) {
+              pending.completeError(
+                StateError('Google sign-in closed or was blocked.'),
+              );
+            }
+          }).toJS,
         ),
       );
-      // Trigger on the user's tap; token refresh never opens a timed popup.
-      tokenClient.requestAccessToken();
+      // Trigger the popup in the original click stack.
+      client.requestAccessToken();
     } catch (_) {
       if (!pending.isCompleted) {
         pending.completeError(
@@ -224,4 +219,35 @@ class _WebGoogleDriveSyncPort implements GoogleDriveSyncPort {
     _token = null;
     _expiresAt = null;
   }
+}
+
+@JS('google')
+external JSObject? get _google;
+
+@JS('google.accounts.oauth2.initTokenClient')
+external _GoogleTokenClient _initGoogleTokenClient(
+  _GoogleTokenOptions options,
+);
+
+@JS()
+extension type _GoogleTokenOptions(JSObject _) implements JSObject {
+  external _GoogleTokenOptions({
+    required String client_id,
+    required String scope,
+    required JSFunction callback,
+    required JSFunction error_callback,
+  });
+}
+
+@JS()
+extension type _GoogleTokenClient(JSObject _) implements JSObject {
+  external void requestAccessToken();
+}
+
+@JS()
+extension type _GoogleTokenResponse(JSObject _) implements JSObject {
+  external String? get error;
+  external String? get scope;
+  external String? get access_token;
+  external int? get expires_in;
 }
