@@ -21,6 +21,7 @@ class GoogleDriveSyncService {
         _now = now ?? DateTime.now;
 
   /// Friendly name of the single cloud backup file.
+  /// Stable filename to make one backup easy to locate in Drive.
   static const String fileName = 'SageLift - Latest Backup.json';
   static const String _prefix = 'sagelift.drive.';
   static const String _clientIdKey = '${_prefix}clientId';
@@ -82,6 +83,7 @@ class GoogleDriveSyncService {
   }
 
   /// Enables or disables periodic uploads without changing local records.
+  /// Changes the opt-in foreground sync preference without uploading.
   Future<void> setAutoSyncEnabled(bool value) =>
       _store.write<bool>(_enabledKey, value);
 
