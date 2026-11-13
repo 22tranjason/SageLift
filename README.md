@@ -119,3 +119,37 @@ Seed values are exact variants checked on official product pages in November
 vanilla 160 g pot (91 kcal, 15.2 g protein). Current packaging takes precedence:
 https://upandgo.com.au/products/protein-energize and
 https://www.yopro.com.au/products/pots/pot-vanilla/.
+
+## Optional Google Drive backup sync
+
+The web app can upload one **private** `SageLift - Latest Backup.json` file to
+your Google Drive. It uses the same full, versioned JSON as the local backup
+feature, except it removes `sagelift.drive.*` app-connection metadata. This
+includes all profiles; only connect an account you trust. **No data is sent to
+GitHub**, and Google access tokens are never written into SageLift storage.
+
+First-time setup (one-time Google Cloud configuration):
+
+1. In [Google Cloud Console](https://console.cloud.google.com/), create/select
+   a project and **enable the Google Drive API**.
+2. Configure the OAuth consent screen / Google Auth Platform, and add your
+   Google account as a test user if the application is in testing mode.
+3. Create an **OAuth 2.0 Client ID** of type **Web application**, with
+   **Authorized JavaScript origin** `https://22tranjason.github.io`.
+   You do not need to put a client secret or access token in GitHub or SageLift.
+4. In SageLift, go to **Settings → Private Google Drive sync**, paste the
+   `*.apps.googleusercontent.com` client ID, and tap **Connect & Sync now**.
+   Choose your account and grant Google Drive access to files created by this app.
+
+The app requests only Google's `drive.file` scope, so it cannot browse other
+Google Drive files. It reuses one backup file instead of creating a new file
+every few minutes. By default, after a successful first upload, it checks for
+changes every three minutes **while the app is open and authorised** and also
+when you return to the app. Unchanged data is skipped. If you close/reload the
+app or the short-lived token expires, tap **Connect & Sync now** to authorise
+again; Google's browser token model intentionally cannot refresh without a
+user interaction. The app does not perform background sync when closed.
+
+**Local SageLift logging, ordinary backup and restore continue to work without
+Drive.** Disconnecting only removes this browser's connection information; it
+does not remove your local records or the already uploaded Drive file.

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../features/settings/data/services/google_drive_sync_service.dart';
 import '../features/settings/domain/app_theme_preference.dart';
 import '../features/settings/presentation/providers/deployment_update_controller.dart';
 import '../features/settings/presentation/theme_preference_controller.dart';
@@ -20,16 +21,21 @@ class SageLiftApp extends ConsumerStatefulWidget {
 
 class _SageLiftAppState extends ConsumerState<SageLiftApp>
     with WidgetsBindingObserver {
+  Timer? _driveSyncTimer;
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _driveSyncTimer = Timer.periodic(const Duration(minutes: 3), (_) {
+      unawaited(ref.read(googleDriveSyncServiceProvider).syncIfAuthorized());
+    });
     unawaited(
         ref.read(deploymentUpdateControllerProvider.notifier).checkForUpdate());
   }
 
   @override
   void dispose() {
+    _driveSyncTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -37,6 +43,7 @@ class _SageLiftAppState extends ConsumerState<SageLiftApp>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      unawaited(ref.read(googleDriveSyncServiceProvider).syncIfAuthorized());
       unawaited(
         ref.read(deploymentUpdateControllerProvider.notifier).checkForUpdate(),
       );
