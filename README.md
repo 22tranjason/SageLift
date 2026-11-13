@@ -82,3 +82,15 @@ git commit -m "chore: initialize SageLift foundation"
 The deployed web app is available at `https://22tranjason.github.io/SageLift/` after the GitHub Pages workflow has successfully run from `main`. It uses browser-local storage, so it works without a backend or cloud database.
 
 Safari website-data clearing can erase SageLift data. Each browser and device keeps a separate local copy of that data.
+
+## Beginner workouts and progress picker
+
+Use **Switch to Nhi’s workouts** on Today for a gentle repeatable full-body session.
+The choice is remembered on that browser. Nhi can use the app on her own phone;
+there is no automatic cross-device sync. Her draft and completion records use a
+separate settings key and are included in the existing backup/export. Jason's
+workout history and progression are unchanged. The Progress picker defaults to
+exercises with completed logged sets; **Show all exercises** reveals the catalogue
+without deleting older records.
+
+CI uses Flutter 3.44.9 to keep the existing Material API and validation reproducible.

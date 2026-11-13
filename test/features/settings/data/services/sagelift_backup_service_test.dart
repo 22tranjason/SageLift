@@ -52,6 +52,22 @@ void main() {
     await temporaryDirectory.delete(recursive: true);
   });
 
+  test('backup restores Nhi draft and profile alongside Jason history',
+      () async {
+    await _seed(exerciseBox, workoutBox, checkInBox, habitBox, settingsBox);
+    const String draft = '{"active":true,"done":["0-0"]}';
+    await settingsBox.put('nhi.beginner.v1', draft);
+    await settingsBox.put('training.profile', 'nhi');
+    final SageLiftBackupService service =
+        _service(exerciseBox, workoutBox, checkInBox, habitBox, settingsBox);
+    final String contents = service.createBackup().contents;
+    await settingsBox.clear();
+    await service.restore(contents);
+    expect(settingsBox.get('nhi.beginner.v1'), draft);
+    expect(settingsBox.get('training.profile'), 'nhi');
+    expect(workoutBox.get('workout-1')?.name, 'Completed workout');
+  });
+
   test('backup includes workout records and daily target data', () async {
     await _seed(exerciseBox, workoutBox, checkInBox, habitBox, settingsBox);
     final SageLiftBackup backup = _service(

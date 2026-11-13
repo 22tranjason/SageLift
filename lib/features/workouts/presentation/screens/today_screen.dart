@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/app_router.dart';
+import '../../../beginner/presentation/nhi_screen.dart';
+import '../../../beginner/presentation/training_profile.dart';
 import '../../domain/models/workout.dart';
 import '../../domain/services/workout_program.dart';
 import '../providers/empty_workout_cancellation_provider.dart';
@@ -20,6 +22,11 @@ class TodayScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final AsyncValue<String> profile = ref.watch(trainingProfileProvider);
+    if (profile.isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (profile.valueOrNull == 'nhi') return const NhiScreen();
     final AsyncValue<TodayWorkout?> todayWorkout = ref.watch(
       todayWorkoutProvider,
     );
@@ -45,9 +52,10 @@ class TodayScreen extends ConsumerWidget {
         title: const Text('Today'),
         actions: <Widget>[
           IconButton(
-              tooltip: 'Progress',
-              icon: const Icon(Icons.show_chart),
-              onPressed: () => context.pushNamed(AppRoute.progress.name)),
+            tooltip: 'Progress',
+            icon: const Icon(Icons.show_chart),
+            onPressed: () => context.pushNamed(AppRoute.progress.name),
+          ),
           TextButton(
             onPressed: () {
               unawaited(context.pushNamed(AppRoute.workoutHistory.name));
@@ -69,6 +77,25 @@ class TodayScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
+              TextButton.icon(
+                icon: const Icon(Icons.person_outline),
+                label: const Text('Switch to Nhi’s workouts'),
+                onPressed: () async {
+                  try {
+                    await selectTrainingProfile(ref, 'nhi');
+                  } catch (_) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Could not switch profiles. Please retry.',
+                          ),
+                        ),
+                      );
+                    }
+                  }
+                },
+              ),
               Text(
                 'Good Morning Jason',
                 style: Theme.of(context).textTheme.headlineSmall,
@@ -154,11 +181,17 @@ class TodayScreen extends ConsumerWidget {
                           WorkoutStatus.inProgress)
                         TextButton(
                           key: const ValueKey<String>('cancel-workout-button'),
-                          onPressed: ref.watch(workoutDraftFinishingProvider(
-                                  workoutData.workout.id))
+                          onPressed: ref.watch(
+                            workoutDraftFinishingProvider(
+                              workoutData.workout.id,
+                            ),
+                          )
                               ? null
                               : () => _cancelWorkout(
-                                  context, ref, workoutData.workout),
+                                    context,
+                                    ref,
+                                    workoutData.workout,
+                                  ),
                           child: const Text('Cancel Workout'),
                         ),
                       const SizedBox(height: 8),
@@ -223,20 +256,26 @@ class TodayScreen extends ConsumerWidget {
   }
 
   Future<void> _cancelWorkout(
-      BuildContext context, WidgetRef ref, Workout workout) async {
+    BuildContext context,
+    WidgetRef ref,
+    Workout workout,
+  ) async {
     final bool confirmed = await showDialog<bool>(
           context: context,
           builder: (BuildContext dialogContext) => AlertDialog(
             title: const Text('Cancel empty workout?'),
             content: const Text(
-                'Only this active session will be reset if it has no entered values. Your past history stays saved. The latest plan will be ready when you tap Start Workout.'),
+              'Only this active session will be reset if it has no entered values. Your past history stays saved. The latest plan will be ready when you tap Start Workout.',
+            ),
             actions: <Widget>[
               TextButton(
-                  onPressed: () => Navigator.pop(dialogContext, false),
-                  child: const Text('Keep workout')),
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Keep workout'),
+              ),
               FilledButton(
-                  onPressed: () => Navigator.pop(dialogContext, true),
-                  child: const Text('Cancel empty workout')),
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Cancel empty workout'),
+              ),
             ],
           ),
         ) ??
@@ -245,13 +284,20 @@ class TodayScreen extends ConsumerWidget {
     try {
       await ref.read(emptyWorkoutCancellationProvider).cancel(workout.id);
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Empty workout cancelled. The latest plan is ready.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Empty workout cancelled. The latest plan is ready.'),
+        ),
+      );
     } catch (_) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
           content: Text(
-              'Unable to cancel safely. Entries, a custom plan, or a saving problem may need attention. Your history has not been deleted.')));
+            'Unable to cancel safely. Entries, a custom plan, or a saving problem may need attention. Your history has not been deleted.',
+          ),
+        ),
+      );
     }
   }
 
