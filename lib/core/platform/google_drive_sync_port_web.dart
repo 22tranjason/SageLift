@@ -1,5 +1,5 @@
 // Google Identity Services and Google Drive REST are browser-only.
-// ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
+// ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use, non_constant_identifier_names
 
 import 'dart:async';
 import 'dart:convert';
