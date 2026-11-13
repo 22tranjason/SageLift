@@ -94,3 +94,28 @@ exercises with completed logged sets; **Show all exercises** reveals the catalog
 without deleting older records.
 
 CI uses Flutter 3.44.9 to keep the existing Material API and validation reproducible.
+
+## Local food log
+
+Jason's Today screen opens **Food log**. Search favourites/recent foods, tap an
+item, and enter servings or grams (when a reference weight is known). Tap a
+logged item to edit its portion; deletion asks for confirmation. Choose an older
+calendar date to review or correct a previous day.
+
+**Create custom food or recipe** saves the whole meal for reuse, even when the
+next portion dialog is cancelled. For an estimated lunch, use a name such as
+`Chicken rice lunch (estimate)`, a serving such as `1 lunchbox`, and estimated
+calories/protein. Optional weight enables scaling by grams next time. No recipe
+builder, network food database, account, AI API or chat-to-app sync is involved.
+
+The daily total includes food-log entries only. Existing manual daily protein
+records remain untouched and are not added to this total, preventing duplicate
+counting. The diary uses the versioned `jason.foodLog.v1` settings key, included
+in the existing backup/export. Clearing browser data can erase it; different
+phones/browsers do not sync.
+
+Seed values are exact variants checked on official product pages in November
+2026: UP&GO Protein Energize Choc Hit 250 mL (201 kcal, 17.9 g protein) and YoPRO
+vanilla 160 g pot (91 kcal, 15.2 g protein). Current packaging takes precedence:
+https://upandgo.com.au/products/protein-energize and
+https://www.yopro.com.au/products/pots/pot-vanilla/.

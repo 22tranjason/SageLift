@@ -2,6 +2,8 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/nutrition/presentation/food_log_screen.dart';
+
 import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/workouts/presentation/screens/exercise_screen.dart';
 import '../../features/workouts/presentation/screens/progress_screen.dart';
@@ -15,6 +17,9 @@ import '../../features/workouts/presentation/screens/workout_summary_screen.dart
 enum AppRoute {
   /// The default daily dashboard route.
   today,
+
+  /// Jason-only local food diary.
+  foodLog,
 
   /// Per-exercise local workout history chart.
   progress,
@@ -50,6 +55,11 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((Ref ref) {
           return const TodayScreen();
         },
       ),
+      GoRoute(
+          path: '/food-log',
+          name: AppRoute.foodLog.name,
+          builder: (BuildContext context, GoRouterState state) =>
+              const FoodLogScreen()),
       GoRoute(
           path: '/progress',
           name: AppRoute.progress.name,

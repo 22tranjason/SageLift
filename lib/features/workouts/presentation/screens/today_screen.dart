@@ -96,6 +96,10 @@ class TodayScreen extends ConsumerWidget {
                   }
                 },
               ),
+              OutlinedButton.icon(
+                  onPressed: () => context.pushNamed(AppRoute.foodLog.name),
+                  icon: const Icon(Icons.restaurant_outlined),
+                  label: const Text('Food log')),
               Text(
                 'Good Morning Jason',
                 style: Theme.of(context).textTheme.headlineSmall,
