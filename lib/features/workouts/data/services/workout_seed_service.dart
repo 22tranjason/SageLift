@@ -346,13 +346,13 @@ class WorkoutSeedService {
           '8–10 min: easy walking and joint mobility, then 2–4 gradual ramp-up sets for the first lift; add light preparation sets before the next compound lift. Warm-ups are not working sets.',
       prescriptions: const <_ExercisePrescription>[
         _ExercisePrescription(
-          'seed-exercise-barbell-bench-press',
+          'seed-exercise-incline-barbell-bench-press',
           6,
           4,
           'Target 4–6 reps; rest 180 sec; leave 2–3 reps in reserve; no mandatory failure.',
         ),
         _ExercisePrescription(
-          'seed-exercise-incline-dumbbell-press',
+          'seed-exercise-flat-dumbbell-bench-press',
           10,
           3,
           'Target 8–10 reps; rest 120 sec; leave 2–3 reps in reserve; no mandatory failure.',
