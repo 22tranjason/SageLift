@@ -25,8 +25,8 @@ class WorkingSetProgram {
   static const Map<String, List<_Prescription>> _profiles =
       <String, List<_Prescription>>{
     'Chest + Triceps': <_Prescription>[
-      _Prescription('barbell-bench-press', 6, '4–6', '180', 4, 3),
-      _Prescription('incline-dumbbell-press', 10, '8–10', '120', 3, 3),
+      _Prescription('incline-barbell-bench-press', 6, '4–6', '180', 4, 3),
+      _Prescription('flat-dumbbell-bench-press', 10, '8–10', '120', 3, 3),
       _Prescription('dumbbell-fly', 15, '10–15', '75', 3, 3),
       _Prescription(
           'overhead-dumbbell-triceps-extension', 15, '10–15', '75', 3, 3),
@@ -58,11 +58,19 @@ class WorkingSetProgram {
     ],
   };
 
-  static String _currentId(String id) => id == EquipmentProgramUpdate.cableFly
-      ? EquipmentProgramUpdate.dumbbellFly
-      : id == _oldCurl
-          ? _curl
-          : id;
+  static String _currentId(String id) {
+    if (id == EquipmentProgramUpdate.cableFly) {
+      return EquipmentProgramUpdate.dumbbellFly;
+    }
+    if (id == _oldCurl) return _curl;
+    if (id == 'seed-exercise-barbell-bench-press') {
+      return 'seed-exercise-incline-barbell-bench-press';
+    }
+    if (id == 'seed-exercise-incline-dumbbell-press') {
+      return 'seed-exercise-flat-dumbbell-bench-press';
+    }
+    return id;
+  }
 
   /// Upgrades only clean recognised plans; callers also protect saved drafts.
   /// Future historical clones call this after clearing performed values.
@@ -91,9 +99,24 @@ class WorkingSetProgram {
     final List<String> targetIds =
         profile.map((_Prescription p) => p.id).toList();
     final List<String> ids = workout.exerciseIds.map(_currentId).toList();
+    final List<String> previousChestIds = <String>[
+      'seed-exercise-barbell-bench-press',
+      'seed-exercise-incline-dumbbell-press',
+      EquipmentProgramUpdate.dumbbellFly,
+      'seed-exercise-overhead-dumbbell-triceps-extension',
+      'seed-exercise-cable-triceps-pushdown',
+    ];
+    final List<String> previousChestIdsWithCableFly = <String>[
+      'seed-exercise-barbell-bench-press',
+      'seed-exercise-incline-dumbbell-press',
+      EquipmentProgramUpdate.cableFly,
+      'seed-exercise-overhead-dumbbell-triceps-extension',
+      'seed-exercise-cable-triceps-pushdown',
+    ];
     final bool oldChest = workout.name == 'Chest + Triceps' &&
-        workout.exerciseIds.contains(EquipmentProgramUpdate.cableFly) &&
-        ids.join('|') == targetIds.take(4).join('|');
+        (workout.exerciseIds.join('|') == previousChestIds.join('|') ||
+            workout.exerciseIds.join('|') ==
+                previousChestIdsWithCableFly.join('|'));
     final List<String> oldLegIds = <String>[
       ...targetIds.take(3),
       EquipmentProgramUpdate.walkout,
